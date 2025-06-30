@@ -1,0 +1,87 @@
+= readsaber =
+
+== Format ==
+readsaber ?options? annotationfile result fastq ?fastq? ...
+
+== Description ==
+readsaber annotates the reads in fastq files with the sequences given in annotationfile.
+It will create a read structure schema per read, which consists of a list of annotations as found in read. 
+For each annotation (sequence found in the read) the following elements are added in the schema:
+* strand: strand the annotation is found in, is + or -, or ~ for unknown/irrelevant
+* annotation_name: This is the name of the annotation sequence in the fasta file. Keep these names short for better overview
+
+If there is no annotation on the read for more than 2 bases, ~ N will be added to the schema. 
+If the same annotation (name) occurs multiple times, interrupted by <= 2
+bases, they are joined (shown only once in the schema). Overlapping annotation
+are (currently) greedily cut, keeping the one encountered first.
+
+readsaber is made to annotate reads with adapter, primer and other sequences which are
+typically relatively short (~20 bases), and can handle these very well.
+Matches that are significantly shorter may be missed.
+
+For example, when annotating long read sequencing of 10x data with the following annotation file (contents)
+{{{
+>P5
+AATGATACGGCGACCACCGAGATCTACAC
+>Read1
+ACACTCTTTCCCTACACGACGCTCTTCCGATCT
+>polyT
+TTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+>Read2
+GATCGGAAGAGCACACGTCTGAACTCCAGTCAC
+>P7
+ATCTCGTATGCCGTCTTCTGCTTG
+>TSO
+CCCATGTACTCTGCGTTGATACCACTGCTT
+>ont5
+ATCGCCTACCGTGACAAGAAAGTTGTCGGTGTCTTTGTGACTTGCCTGTCGCTCTATCTTC
+>ont3
+GAGACGCAACTATGGTGACGAACGTTATAGTCGTGGTTGTCTTTCGAC
+}}}
+
+the top 4 resulting read structures/schemas expected to be found here would be:
+{{{
+- TSO ~ transcript ~ N - Read1
++ Read1 ~ N ~ transcript + TSO
++ Read1 ~ N + polyT ~ transcript + TSO
+- TSO ~ transcript - polyT ~ N - Read1
+}}}
+
+showing the reverse and forward default read structure (where N indicates the location of the barcode and UMI sequence)
+of reads where the polyA was not detected (too short) and the same where it was detected.
+There will typically be many more read structures, but with (much) lower
+abundance, some of them due to the annotation process (e.g. missing elements because they are shortened or to different to match),
+some due to actual different read structures present.
+
+
+=== Results ===
+Results will be written to the file given in **result**, a [[tsv]] file with the following fields
+; rname: name of the read
+; schema: read structure schema
+; schema2: alternative read structure schema (adds size to N stretches)
+
+Another file **<resultroot>_summary.tsv** (where <resultroot> is the file name **result** without filename extension),
+will be made with summary data: each read structure found together with the number of reads
+that have this structure (and the percentage). They are sorted by abundance, with the most common structures listed first
+
+=== Transcript annotation ===
+You can give (as an option) a reference genome sequence. In this case reads will also be aligned to this
+reference genome (using minimap2 with the splice option) and locations in the read that align to it
+will be annotated as "transcript".
+
+== Arguments ==
+* annotationfile: A fasta file with the sequences you want to annotate the reads
+* result: result file: a [[tsv]] file with the annotation schema per read. Add .zst to the filename to compress (esp. for large data sets)
+* fastq: fastq file(s) to annotate
+
+== Options ==
+; -refseq file/dir: file or directory containing a reference genome sequence
+; -addsequences 0/1: set to 1 to add sequence data to the per read output file
+; -keepintermediate 0/1: set to 1 to keep intermediate files for development/debugging
+
+The command supports analysing fastqs/ubams in parallel using [[joboptions]], e.g. adding -d <number> will analyse each fastq on
+a separate core on the local server with a maximum of <number> cores.
+
+
+== Category ==
+Annotation
