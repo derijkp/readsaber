@@ -49,6 +49,26 @@ seq3	9	25	16	+	polyT
 seq4	9	25	16	+	polyT
 seq4	29	41	12	+	polyT}
 
+test polyt {tabs/space in readnames} {
+	file_write tmp/test.fastq [deindent {
+		@seq1	test1
+		GCCGTTTTTTTTGCCGT
+		+
+		IIIIIIIIIIIIIIIII
+		@seq2	test2
+		GCCGTTTTTTGCCGT
+		+
+		IIIIIIIIIIIIIII
+		@seq3 test3
+		GTCGTCTTGTTGTCTTTTCTTTTTTGC
+		+
+		IIIIIIIIIIIIIIIIIIIIIIIIIII
+	}]\n
+	exec polyt < tmp/test.fastq
+} {rname	rstart	rend	size	strand	chromosome
+seq1	4	12	8	+	polyT
+seq3	9	25	16	+	polyT}
+
 test readsaber {basic} {
 	test_cleantmp
 	exec readsaber_makerefdir tmp/genome_test data/genome_test.fa 2> tmp/test1_makeref.log

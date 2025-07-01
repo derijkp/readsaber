@@ -3,7 +3,7 @@
  */
 
 #define _FILE_OFFSET_BITS 64
-#define MAX_READNAME_SIZE 1024
+#define MAX_READNAME_SIZE 16384
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -25,7 +25,12 @@ int main(int argc, char *argv[]) {
 	fprintf(stdout,"rname\trstart\trend\tsize\tstrand\tchromosome\n");
 	while (fgets_unlocked(readname, MAX_READNAME_SIZE, stdin)) {
 		/* remove newline */
-		readname[strcspn(readname, "\n")] = 0;
+		register char *crn=readname;
+		while (*crn != '\0') {
+			if (*crn == '\n' || *crn == '\t' || *crn == ' ') break;
+			crn++;
+		}
+		*crn = '\0';
 /* fprintf(stderr,"%s\n",readname); */
 		curpos = 0;
 		polyTstart = -1 ; polyTend = -1 ; polyTnum = 0 ; polyTgaps = 0 ; polyTpgaps = 0 ; polyTpnum = 0; 
@@ -90,8 +95,14 @@ int main(int argc, char *argv[]) {
 			curpos++;
 		}
 		/* read (And ignore) the + and quality line */
-		if (!fgets_unlocked(readname, MAX_READNAME_SIZE, stdin)) break;
-		if (!fgets_unlocked(readname, MAX_READNAME_SIZE, stdin)) break;
+		while (1) {
+			c=getc_unlocked(stdin);
+			if (c == '\n' || c == EOF) break;
+		}
+		while (1) {
+			c=getc_unlocked(stdin);
+			if (c == '\n' || c == EOF) break;
+		}
 	}
 	exit(EXIT_SUCCESS);
 }
