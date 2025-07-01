@@ -78,4 +78,4 @@ if {[file exists $dest]} {
 }
 file copy $genomecomb $dest
 cd $appdir
-file copy -force readsaber readsaber.tcl readsaber_makerefdir readsaber_makerefdir.tcl readsaber.wiki README.md $dest
+file copy -force readsaber readsaber.tcl bin readsaber_makerefdir readsaber_makerefdir.tcl README.md help $dest

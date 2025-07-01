@@ -15,6 +15,8 @@ while 1 {
 }
 set readsaberdir [file dir $script]
 
+set ::env(PATH) $readsaberdir/bin:$::env(PATH)
+
 # replace help_get from genomecomb so `readsaber -h` works
 auto_load help_get
 proc help_get {action} {
@@ -30,6 +32,7 @@ proc readsaber_job {args} {
 	set keepintermediate 0
 	set addsequences 0
 	set ignoreN 3
+	set polyT 7
 	if {[lindex $args] in "-h -help help"} {
 		help readsaber
 		exit 0
@@ -39,6 +42,10 @@ proc readsaber_job {args} {
 		-keepintermediate {set keepintermediate $value}
 		-addsequences {set addsequences $value}
 		-ignoreN {set ignoreN $value}
+		-polyT {
+			if {![isint $value]} {error "$value is not an integer; -polyT value must be an integer"}
+			set polyT $value
+		}
 		-version - -V {
 			puts "v0.1.0"
 			exit 0
@@ -81,20 +88,32 @@ proc readsaber_job {args} {
 	set alist {}
 	foreach fastq $fastqs {
 		set tail [file root [gzroot [file tail $fastq]]]
-		job readannot_match-$tail -deps {
+		set toadd [list $workdir/$root-$tail.ali.tsv.zst]
+		set tempfastq $workdir/$root-$tail.fastq.gz
+		job maketempfastq-$root-$tail -deps {
 			$fastq
+		} -targets {
+			$tempfastq
+		} -vars {
+			fastq tempfastq
+		} -code {
+			if {[file extension $fastq] eq ".bam"} {
+				catch_exec samtools fastq -T "RG,CB,QT,MI,MM,ML,Mm,Ml" $fastq | cg bgzip > $tempfastq.temp
+			} elseif {[file extension $fastq] eq ".gz"} {
+				mklink $fastq $tempfastq.temp
+			} else {
+				catch_exec cg bgzip -o $tempfastq.temp $fastq
+			}
+			file rename $tempfastq.temp $tempfastq
+		}
+		job readannot_match-$root-$tail -deps {
+			$tempfastq
 		} -targets {
 			$workdir/$root-$tail.ali.tsv.zst
 		} -vars {
-			fastq ref refseq workdir root tail
+			fastq ref refseq workdir root tail tempfastq
 		} -code {
-			set tempfile [tempfile].fastq.gz
-			if {[file extension $fastq] eq ".bam"} {
-				catch_exec samtools fastq -T "RG,CB,QT,MI,MM,ML,Mm,Ml" $fastq | gzip > $tempfile
-			} else {
-				mklink $fastq $tempfile
-			}
-			catch_exec minimap2 -Y -a -x map-ont -t 4 -n 1 -m 1 -k 5 -w 1 -s 20 $ref $tempfile \
+			catch_exec minimap2 -Y -a -x map-ont -t 4 -n 1 -m 1 -k 5 -w 1 -s 20 $ref $tempfastq \
 			    | cg zst > $workdir/$root-$tail.ali.sam.zst 2>@ stderr
 			cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.ali.sam.zst | cg select -f {
 				rname=$qname
@@ -106,20 +125,15 @@ proc readsaber_job {args} {
 			file rename -force $workdir/$root-$tail.ali.tsv.temp.zst $workdir/$root-$tail.ali.tsv.zst
 		}
 		if {$refseq ne ""} {
-			job readannot_match_ref-$tail -mem [map_mem_minimap2 "" 4 map-ont $refseq] -deps {
-				$refseq
+			lappend toadd $workdir/$root-$tail.refseq.ali.tsv.zst
+			job readannot_match_ref-$root-$tail -mem [map_mem_minimap2 "" 4 map-ont $refseq] -deps {
+				$refseq $tempfastq
 			} -targets {
 				$workdir/$root-$tail.refseq.ali.tsv.zst
 			} -vars {
-				fastq ref refseq workdir root tail
+				fastq ref refseq workdir root tail tempfastq
 			} -code {
-				set tempfile [tempfile].fastq.gz
-				if {[file extension $fastq] eq ".bam"} {
-					catch_exec samtools fastq -T "RG,CB,QT,MI,MM,ML,Mm,Ml" $fastq | gzip > $tempfile
-				} else {
-					mklink $fastq $tempfile
-				}
-				catch_exec minimap2 -P -Y -a -x map-ont --splice -t 4 $refseq $tempfile \
+				catch_exec minimap2 -P -Y -a -x map-ont --splice -t 4 $refseq $tempfastq \
 				    | cg zst > $workdir/$root-$tail.refseq.ali.sam.zst 2>@ stderr
 				cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.refseq.ali.sam.zst | cg select -f {
 					rname=$qname 
@@ -131,18 +145,36 @@ proc readsaber_job {args} {
 				file rename -force $workdir/$root-$tail.refseq.ali.tsv.temp.zst $workdir/$root-$tail.refseq.ali.tsv.zst
 			}
 		}
+		if {$polyT} {
+			lappend toadd $workdir/$root-$tail.polyt.ali.tsv.zst
+			job readannot_polyt-$root-$tail -deps {
+				$tempfastq
+			} -targets {
+				$workdir/$root-$tail.polyt.ali.tsv.zst
+			} -vars {
+				fastq ref refseq workdir root tail tempfastq
+			} -code {
+				catch_exec cg zcat $tempfastq | polyt \
+				    | cg zst > $workdir/$root-$tail.polyt.ali.tsv.temp.zst
+				file rename -force $workdir/$root-$tail.polyt.ali.tsv.temp.zst $workdir/$root-$tail.polyt.ali.tsv.zst
+			}
+		}
 		set target $workdir/$root-$tail.tsv.zst
-		job readannot_schema-$tail -deps {
+		job readannot_schema-$root-$tail -deps {
 			$workdir/$root-$tail.ali.tsv.zst
 			($workdir/$root-$tail.refseq.ali.tsv.zst)
+			($workdir/$root-$tail.polyt.ali.tsv.zst)
 		} -targets {
 			$target
+		} -rmtargets {
+			$tempfastq
 		} -vars {
-			fastq ref refseq workdir root tail addsequences ignoreN
+			fastq ref refseq workdir root tail addsequences ignoreN polyT toadd tempfastq
 		} -code {
+			# file delete $tempfastq
 			set concat $workdir/$root-$tail.concat.ali.tsv.zst
-			if {$refseq ne ""} {
-				cg cat $workdir/$root-$tail.ali.tsv.zst $workdir/$root-$tail.refseq.ali.tsv.zst \
+			if {$refseq ne "" || $polyT} {
+				cg cat -m 1 {*}$toadd \
 					| cg select -s {rname rstart rend} | cg zst > $concat.temp.zst
 			} else {
 				cg select -overwrite 1 -s {rname rstart rend} $workdir/$root-$tail.ali.tsv.zst $concat.temp.zst
@@ -166,8 +198,12 @@ proc readsaber_job {args} {
 			set data [list_sub [split $line \t] $poss]
 			set todo [list $data]
 			set curname [lindex $data 0]
+			set lastone 0
 			while 1 {
-				if {[gets $f line] == -1} break
+				if {[gets $f line] == -1} {
+					if {$lastone} break
+					set lastone 1
+				}
 				set nextdata [list_sub [split $line \t] $poss]
 				set nextrname [lindex $nextdata 0]
 				# foreach {rname rstart rend strand chromosome AS ms seq} $data break
@@ -176,11 +212,15 @@ proc readsaber_job {args} {
 					continue
 				}
 				if {![llength $todo]} continue
+				# we have a full todo (all hits on one read), process
 				set schema {}
 				set schema2 {}
 				set sequences {}
 				set curpos 0
 				foreach {rname rstart rend strand chromosome AS ms seq} [lindex $todo 0] break
+#				# see if we can add polyT/polyA annotations
+#				set locs [regexp -all -indices -inline {AAAAA+|TTTTT+} $seq]
+				# make schema
 				if {$addsequences} {
 					if {$strand eq "-"} {set seq [seq_complement $seq]}
 				}
