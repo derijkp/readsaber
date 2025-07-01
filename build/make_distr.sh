@@ -32,9 +32,6 @@ if {[file tail $scriptdir] eq "build"} {
 	set appdir $scriptdir
 }
 
-putsvars appdir script
-exit 1
-
 # parse arguments
 # ---------------
 
@@ -71,11 +68,12 @@ if {![file exists $genomecomb]} {
 
 # make distribution
 # -----------------
-puts "build readsaber distribution in $dest"
+puts "build readsaber distribution in $dest (based on $genomecomb)"
 if {[file exists $dest]} {
 	file delete -force $dest.old
 	file rename $dest $dest.old
 }
 file copy $genomecomb $dest
 cd $appdir
-file copy -force readsaber readsaber.tcl bin readsaber_makerefdir readsaber_makerefdir.tcl README.md help $dest
+file copy -force readsaber readsaber.tcl readsaber_makerefdir readsaber_makerefdir.tcl README.md help $dest
+file copy -force {*}[glob bin/*] $dest/bin
