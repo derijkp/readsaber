@@ -1,0 +1,5 @@
+schema	count	percent
++ Read1 + polyT ~ transcript + TSO	2	33.33
+~ N + polyT ~ N	2	33.33
+~ N	1	16.67
+~ N + polyT ~ N + polyT	1	16.67
