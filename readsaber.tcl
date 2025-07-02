@@ -116,7 +116,7 @@ proc readsaber_job {args} {
 			catch_exec minimap2 -Y -a -x map-ont -t 4 -n 1 -m 1 -k 5 -w 1 -s 20 $ref $tempfastq \
 			    | cg zst > $workdir/$root-$tail.ali.sam.zst 2>@ stderr
 			cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.ali.sam.zst | cg select -f {
-				rname=$qname
+				rname="@$qname"
 				{rstart=if($strand eq "+",$qstart,$seqlen - $qend)}
 				{rend=if($strand eq "+",$qend,$seqlen - $qstart)}
 				{size=$qend - $qstart}
@@ -136,7 +136,7 @@ proc readsaber_job {args} {
 				catch_exec minimap2 -P -Y -a -x map-ont --splice -t 4 $refseq $tempfastq \
 				    | cg zst > $workdir/$root-$tail.refseq.ali.sam.zst 2>@ stderr
 				cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.refseq.ali.sam.zst | cg select -f {
-					rname=$qname 
+					rname="@$qname"
 					{rstart=if($strand eq "+",$qstart,$seqlen - $qend)}
 					{rend=if($strand eq "+",$qend,$seqlen - $qstart)}
 					{size=$qend - $qstart}
@@ -277,9 +277,9 @@ proc readsaber_job {args} {
 				}
 				# write to output
 				if {$addsequences} {
-					puts $o $curname\t[join $schema]\t[join $schema2]\t$sequences
+					puts $o [string range $curname 1 end]\t[join $schema]\t[join $schema2]\t$sequences
 				} else {
-					puts $o $curname\t[join $schema]\t[join $schema2]
+					puts $o [string range $curname 1 end]\t[join $schema]\t[join $schema2]
 				}
 				set curname $nextrname
 				set curpos 0

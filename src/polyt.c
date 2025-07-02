@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
 				polyTgaps++;
 				if (polyTgaps > 3 || polyTpgaps >= 3 || c == '\n' || c == EOF) {
 					if (polyTnum >= 8) {
-						fprintf(stdout,"%s\t%d\t%d\t%d\t+\tpolyT\n",readname+1,polyTstart,polyTend,polyTend-polyTstart);
+						fprintf(stdout,"%s\t%d\t%d\t%d\t+\tpolyT\n",readname,polyTstart,polyTend,polyTend-polyTstart);
 					}
 					polyTstart = -1;
 				}
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
 				polyAgaps++;
 				if (polyAgaps > 3 || polyApgaps >= 3 || c == '\n' || c == EOF) {
 					if (polyAnum >= 8) {
-						fprintf(stdout,"%s\t%d\t%d\t%d\t-\tpolyT\n",readname+1,polyAstart,polyAend,polyAend-polyAstart);
+						fprintf(stdout,"%s\t%d\t%d\t%d\t-\tpolyT\n",readname,polyAstart,polyAend,polyAend-polyAstart);
 					}
 					polyAstart = -1;
 				}
