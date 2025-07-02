@@ -174,6 +174,7 @@ proc readsaber_job {args} {
 			# file delete $tempfastq
 			set concat $workdir/$root-$tail.concat.ali.tsv.zst
 			if {$refseq ne "" || $polyT} {
+				set tempfile [tempfile]
 				cg cat -m 1 {*}$toadd \
 					| cg select -s {rname rstart rend} | cg zst > $concat.temp.zst
 			} else {
@@ -185,7 +186,7 @@ proc readsaber_job {args} {
 			catch {gzclose $f}; catch {gzclose $o}
 			set f [gzopen $src]
 			set o [wgzopen $target.temp.zst]
-			set oheader rname\tschema\tschema2
+			set oheader rname\treadsize\tschema\tschema2
 			if {$addsequences} {append oheader \tsequences}
 			puts $o $oheader
 			set header [tsv_open $f]
@@ -218,6 +219,7 @@ proc readsaber_job {args} {
 				set sequences {}
 				set curpos 0
 				foreach {rname rstart rend strand chromosome AS ms seq} [lindex $todo 0] break
+				set readsize [string length $seq]
 #				# see if we can add polyT/polyA annotations
 #				set locs [regexp -all -indices -inline {AAAAA+|TTTTT+} $seq]
 				# make schema
@@ -277,9 +279,9 @@ proc readsaber_job {args} {
 				}
 				# write to output
 				if {$addsequences} {
-					puts $o [string range $curname 1 end]\t[join $schema]\t[join $schema2]\t$sequences
+					puts $o [string range $curname 1 end]\t$readsize\t[join $schema]\t[join $schema2]\t$sequences
 				} else {
-					puts $o [string range $curname 1 end]\t[join $schema]\t[join $schema2]
+					puts $o [string range $curname 1 end]\t$readsize\t[join $schema]\t[join $schema2]
 				}
 				set curname $nextrname
 				set curpos 0
@@ -300,7 +302,7 @@ proc readsaber_job {args} {
 	} -code {
 		cg cat {*}$alist {*}[compresspipe $result] > $result.temp2
 		file rename -force $result.temp2 $result
-		cg select -s -count -g schema -gc count,percent $result > $resultdir/${root}_summary.tsv.temp2
+		cg select -s -count -g schema -gc count,percent,q1(readsize),avg(readsize),q3(readsize) $result > $resultdir/${root}_summary.tsv.temp2
 		file rename -force $resultdir/${root}_summary.tsv.temp2 $resultdir/${root}_summary.tsv
 	}
 }
