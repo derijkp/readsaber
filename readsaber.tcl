@@ -314,6 +314,8 @@ proc readsaber_job {args} {
 }
 
 proc readsaber {args} {
+	# pick up options like -stack and -v
+	set args [parse_generic_args readsaber $args]
 	# process common cg job_options (-d, -dsubmit, ...)
 	set args [job_init {*}$args]
 	# run main command
