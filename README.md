@@ -124,6 +124,10 @@ Possible options are:
 `-addsequences 0/1`
     set to 1 to add sequence data to the per read output file
 
+`-polyT number`
+    A polyT will only be called by the specific polyT caller if at least **number** Ts (or As) were seen in a stretch
+    set to 0 to not run the specific polyT caller
+
 `-keepintermediate 0/1`
     set to 1 to keep intermediate files for development/debugging
 

@@ -16,13 +16,14 @@ int main(int argc, char *argv[]) {
 	char readname[MAX_READNAME_SIZE];
 	register int polyTstart,polyTend,polyTnum,polyTgaps,polyTpgaps,polyTpnum;
 	register int polyAstart,polyAend,polyAnum,polyAgaps,polyApgaps,polyApnum;
-	register int curpos;
+	register int curpos,minT;
 	register char c;
-	if ((argc != 1)) {
-		fprintf(stderr,"Format is: polyt\n");
+	if ((argc != 2)) {
+		fprintf(stderr,"Format is: polyt minT\n");
 		exit(EXIT_FAILURE);
 	}
-	fprintf(stdout,"rname\trstart\trend\tsize\tstrand\tchromosome\n");
+	minT = atoi(argv[1]);
+	fprintf(stdout,"rname\trstart\trend\tsize\tnumT\tstrand\tchromosome\n");
 	while (fgets_unlocked(readname, MAX_READNAME_SIZE, stdin)) {
 		/* remove newline */
 		register char *crn=readname;
@@ -36,7 +37,7 @@ int main(int argc, char *argv[]) {
 		polyTstart = -1 ; polyTend = -1 ; polyTnum = 0 ; polyTgaps = 0 ; polyTpgaps = 0 ; polyTpnum = 0; 
 		polyAstart = -1 ; polyAend = -1 ; polyAnum = 0 ; polyAgaps = 0 ; polyApgaps = 0 ; polyApnum = 0; 
 		/* greedy approach, just streaming the sequence; */
-		/* start at any T ; break of after > 3 diff chars, or 3 successive diff ; only output if >= 8 Ts detected */
+		/* start at any T ; break of after > 3 diff chars, or 3 successive diff ; only output if >= minT Ts detected */
 		/* this will not allways get optimal polyA/T because it simply restarts from where broken of */
 		while (1) {
 			c=getc_unlocked(stdin);
@@ -58,8 +59,8 @@ int main(int argc, char *argv[]) {
 			} else if (polyTstart != -1) {
 				polyTgaps++;
 				if (polyTgaps > 3 || polyTpgaps >= 3 || c == '\n' || c == EOF) {
-					if (polyTnum >= 8) {
-						fprintf(stdout,"%s\t%d\t%d\t%d\t+\tpolyT\n",readname,polyTstart,polyTend,polyTend-polyTstart);
+					if (polyTnum >= minT) {
+						fprintf(stdout,"%s\t%d\t%d\t%d\t%d\t+\tpolyT\n",readname,polyTstart,polyTend,polyTend-polyTstart,polyTnum);
 					}
 					polyTstart = -1;
 				}
@@ -83,8 +84,8 @@ int main(int argc, char *argv[]) {
 			} else if (polyAstart != -1) {
 				polyAgaps++;
 				if (polyAgaps > 3 || polyApgaps >= 3 || c == '\n' || c == EOF) {
-					if (polyAnum >= 8) {
-						fprintf(stdout,"%s\t%d\t%d\t%d\t-\tpolyT\n",readname,polyAstart,polyAend,polyAend-polyAstart);
+					if (polyAnum >= minT) {
+						fprintf(stdout,"%s\t%d\t%d\t%d\t%d\t-\tpolyT\n",readname,polyAstart,polyAend,polyAend-polyAstart,polyAnum);
 					}
 					polyAstart = -1;
 				}

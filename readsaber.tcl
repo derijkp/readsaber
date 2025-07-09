@@ -33,7 +33,6 @@ proc readsaber_job {args} {
 	set addsequences 0
 	set ignoreN 3
 	set polyT 7
-	
 	if {[lindex $args] in "-h -help help"} {
 		help readsaber
 		exit 0
@@ -159,9 +158,9 @@ proc readsaber_job {args} {
 			} -targets {
 				$workdir/$root-$tail.polyt.ali.tsv.zst
 			} -vars {
-				fastq ref refseq workdir root tail tempfastq
+				fastq ref refseq workdir root tail tempfastq polyT
 			} -code {
-				catch_exec cg zcat $tempfastq | polyt \
+				catch_exec cg zcat $tempfastq | polyt $polyT \
 				    | cg zst > $workdir/$root-$tail.polyt.ali.tsv.temp.zst
 				file rename -force $workdir/$root-$tail.polyt.ali.tsv.temp.zst $workdir/$root-$tail.polyt.ali.tsv.zst
 			}

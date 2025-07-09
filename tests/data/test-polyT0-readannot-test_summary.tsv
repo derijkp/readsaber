@@ -1,0 +1,4 @@
+schema	count	percent	q1_readsize	avg_readsize	q3_readsize
+~ N	4	57.1429	16.0	29.0	42.0
++ Read1 ~ N ~ transcript + TSO	2	28.5714	162	163.5	165
++ Read1 ~ N + TSO ~ N	1	14.2857	194.0	194.0	194.0
