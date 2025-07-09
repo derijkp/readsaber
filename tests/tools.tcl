@@ -40,6 +40,6 @@ proc test {args} {
 	append description " ($::testdir)"
 	lset args 1 $description
 	pkgtools::test {*}$args
-	cd $::appdir/tests
+	cd $::testdir
 	return {}
 }
