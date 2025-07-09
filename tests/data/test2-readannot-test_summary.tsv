@@ -1,6 +1,6 @@
 schema	count	percent	q1_readsize	avg_readsize	q3_readsize
 + Read1 + polyT ~ transcript + TSO	2	28.5714	162	163.5	165
 ~ N + polyT ~ N	2	28.5714	17	30.0	43
-+ Read1 ~ N + polyT ~ N + TSO ~ N	1	14.2857	194.0	194.0	194.0
++ Read1 ~ N ~ transcript2 ~ N + TSO ~ N	1	14.2857	194.0	194.0	194.0
 ~ N	1	14.2857	15.0	15.0	15.0
 ~ N + polyT ~ N + polyT	1	14.2857	41.0	41.0	41.0

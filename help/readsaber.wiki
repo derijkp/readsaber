@@ -75,7 +75,7 @@ will be annotated as "transcript".
 * fastq: fastq file(s) to annotate
 
 == Options ==
-; -refseq file/dir: file or directory containing a reference genome sequence
+; -refseq file/dir: file or directory containing a reference genome sequence, you can give this options multiple times
 ; -addsequences 0/1: set to 1 to add sequence data to the per read output file
 ; -keepintermediate 0/1: set to 1 to keep intermediate files for development/debugging
 

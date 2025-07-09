@@ -65,4 +65,22 @@ test readsaber {basic} {
 	exec diff tmp/readannot-test_summary.tsv data/test1-readannot-test_summary.tsv
 } {}
 
+test readsaber {multiple refseq} {
+	test_cleantmp
+	exec readsaber_makerefdir tmp/genome_test data/genome_test.fa 2> tmp/test1_makeref.log
+	exec readsaber_makerefdir tmp/genome_test2 data/genome_test2.fa 2> tmp/test2_makeref.log
+	file copy ../annotations/annotations_ontr10x.fa tmp/annot.fa
+	file copy data/test1.fastq tmp/test1.fastq
+	exec readsaber \
+		-keepintermediate 1 \
+		-addsequences 1 \
+		-refseq tmp/genome_test \
+		-refseq tmp/genome_test2 \
+		tmp/annot.fa \
+		tmp/readannot-test.tsv \
+		tmp/test1.fastq 2> tmp/test1.log
+	exec diff tmp/readannot-test.tsv data/test1-readannot-test.tsv
+	exec diff tmp/readannot-test_summary.tsv data/test1-readannot-test_summary.tsv
+} {}
+
 testsummarize

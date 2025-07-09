@@ -117,8 +117,9 @@ results (which you mostly look at) in <result.base>_summary.tsv
 
 
 Possible options are:
-`-refdir`
+`-refseq`
     reference directory with genomesequence, etc. as described previously.
+    You can give this option more than once; Annotations from subsequent refdirs are indicated with transcript2, transcript3, etc.
 
 `-addsequences 0/1`
     set to 1 to add sequence data to the per read output file

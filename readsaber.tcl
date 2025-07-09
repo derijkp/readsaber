@@ -28,17 +28,18 @@ proc help_get {action} {
 proc readsaber_job {args} {
 	upvar job_logdir job_logdir
 	set cmdline [clean_cmdline cg readsaber {*}$args]
-	set refseq {}
+	set refseqs {}
 	set keepintermediate 0
 	set addsequences 0
 	set ignoreN 3
 	set polyT 7
+	
 	if {[lindex $args] in "-h -help help"} {
 		help readsaber
 		exit 0
 	}
 	cg_options readsaber args {
-		-refseq {set refseq [refseq $value]}
+		-refseq {lappend refseqs [refseq $value]}
 		-keepintermediate {set keepintermediate $value}
 		-addsequences {set addsequences $value}
 		-ignoreN {set ignoreN $value}
@@ -111,7 +112,7 @@ proc readsaber_job {args} {
 		} -targets {
 			$workdir/$root-$tail.ali.tsv.zst
 		} -vars {
-			fastq ref refseq workdir root tail tempfastq
+			fastq ref workdir root tail tempfastq
 		} -code {
 			catch_exec minimap2 -Y -a -x map-ont -t 4 -n 1 -m 1 -k 5 -w 1 -s 20 $ref $tempfastq \
 			    | cg zst > $workdir/$root-$tail.ali.sam.zst 2>@ stderr
@@ -124,25 +125,31 @@ proc readsaber_job {args} {
 			} | cg select -s {rname rstart rend} | cg zst > $workdir/$root-$tail.ali.tsv.temp.zst
 			file rename -force $workdir/$root-$tail.ali.tsv.temp.zst $workdir/$root-$tail.ali.tsv.zst
 		}
-		if {$refseq ne ""} {
-			lappend toadd $workdir/$root-$tail.refseq.ali.tsv.zst
+		set refnr 0
+		foreach refseq $refseqs {
+			incr refnr
+			if {$refnr == 1} {set postfix ""} else {set postfix $refnr}
+			set target $workdir/$root-$tail.refseq$postfix.ali.tsv.zst
+			lappend toadd $target
 			job readannot_match_ref-$root-$tail -mem [map_mem_minimap2 "" 4 map-ont $refseq] -deps {
 				$refseq $tempfastq
 			} -targets {
-				$workdir/$root-$tail.refseq.ali.tsv.zst
+				$target
 			} -vars {
-				fastq ref refseq workdir root tail tempfastq
+				fastq ref refseq workdir root tail tempfastq postfix
 			} -code {
 				catch_exec minimap2 -P -Y -a -x map-ont --splice -t 4 $refseq $tempfastq \
-				    | cg zst > $workdir/$root-$tail.refseq.ali.sam.zst 2>@ stderr
-				cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.refseq.ali.sam.zst | cg select -f {
+				    | cg zst > $workdir/$root-$tail.refseq$postfix.ali.sam.zst 2>@ stderr
+				cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.refseq$postfix.ali.sam.zst | cg select -f [string_change {
 					rname="@$qname"
 					{rstart=if($strand eq "+",$qstart,$seqlen - $qend)}
 					{rend=if($strand eq "+",$qend,$seqlen - $qstart)}
 					{size=$qend - $qstart}
-					strand chromosome AS ms begin end mapquality cigar *
-				} -q {$chromosome ne "*"} | cg select -s {rname rstart rend} | cg zst > $workdir/$root-$tail.refseq.ali.tsv.temp.zst
-				file rename -force $workdir/$root-$tail.refseq.ali.tsv.temp.zst $workdir/$root-$tail.refseq.ali.tsv.zst
+					strand
+					{chromosome=if($chromosome ne "*","@ANNOT@","*")}
+					AS ms begin end mapquality cigar *
+				} [list @ANNOT@ transcript$postfix] ] -q {$chromosome ne "*"} | cg select -s {rname rstart rend} | cg zst > $workdir/$root-$tail.refseq$postfix.ali.tsv.temp.zst
+				file rename -force $workdir/$root-$tail.refseq$postfix.ali.tsv.temp.zst $workdir/$root-$tail.refseq$postfix.ali.tsv.zst
 			}
 		}
 		if {$polyT} {
@@ -160,11 +167,8 @@ proc readsaber_job {args} {
 			}
 		}
 		set target $workdir/$root-$tail.tsv.zst
-		job readannot_schema-$root-$tail -deps {
-			$workdir/$root-$tail.ali.tsv.zst
-			($workdir/$root-$tail.refseq.ali.tsv.zst)
-			($workdir/$root-$tail.polyt.ali.tsv.zst)
-		} -targets {
+		job readannot_schema-$root-$tail -deps $toadd \
+		-targets {
 			$target
 		} -rmtargets {
 			$tempfastq
@@ -236,6 +240,8 @@ proc readsaber_job {args} {
 					# putsvars rname rstart rend strand chromosome AS ms
 					if {[regexp ^chr $chromosome]} {
 						set chromosome transcript
+						set strand ~
+					} elseif {[regexp ^transcript $chromosome]} {
 						set strand ~
 					}
 					set emptysize [expr {$rstart-$curpos}]
