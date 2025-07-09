@@ -142,6 +142,22 @@ test readsaber {-polyT 0} {
 	exec diff tmp/readannot-test_summary.tsv data/test-polyT0-readannot-test_summary.tsv
 } {}
 
-
+test readsaber {-completeness 100} {
+	test_cleantmp
+	exec readsaber_makerefdir tmp/genome_test data/genome_test.fa 2> tmp/test1_makeref.log
+	file copy ../annotations/annotations_ontr10x.fa tmp/annot.fa
+	file copy data/test1.fastq tmp/test1.fastq
+	exec readsaber -stack 1 -v 2 \
+		-polyT 0 \
+		-completeness 100 \
+		-keepintermediate 1 \
+		-addsequences 1 \
+		-refseq tmp/genome_test \
+		tmp/annot.fa \
+		tmp/readannot-test.tsv \
+		tmp/test1.fastq 2> tmp/test1.log
+	exec diff tmp/readannot-test.tsv data/test-completeness100-readannot-test.tsv
+	exec diff tmp/readannot-test_summary.tsv data/test-completeness100-readannot-test_summary.tsv
+} {}
 
 testsummarize

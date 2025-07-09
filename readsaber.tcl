@@ -33,6 +33,7 @@ proc readsaber_job {args} {
 	set addsequences 0
 	set ignoreN 3
 	set polyT 7
+	set completeness 50
 	if {[lindex $args] in "-h -help help"} {
 		help readsaber
 		exit 0
@@ -46,6 +47,7 @@ proc readsaber_job {args} {
 			if {![isint $value]} {error "$value is not an integer; -polyT value must be an integer"}
 			set polyT $value
 		}
+		-completeness {set completeness $value}
 		-version - -V {
 			puts "v0.1.0"
 			exit 0
@@ -53,23 +55,23 @@ proc readsaber_job {args} {
 	} {annotationfile result fastq} 3 ... {
 		test
 	}
-	set ref [file_absolute $annotationfile]
+	set annotationfile [file_absolute $annotationfile]
 	set result [file_absolute $result]
 	set fastq [file_absolute $fastq]
 	set fastqs [list [file_absolute $fastq]]
 	foreach fastq $args {
 		lappend fastqs [file_absolute $fastq]
 	}
-	# index ref
-	job readannot_index-[file tail $ref] -deps {
-		$ref
+	# index annotationfile
+	job readannot_index-[file tail $annotationfile] -deps {
+		$annotationfile
 	} -targets {
-		$ref.map-ont
+		$annotationfile.map-ont
 	} -vars {
-		ref
+		annotationfile
 	} -code {
-		exec samtools faidx $ref
-		catch_exec minimap2 -x map-ont -k 5 -w 1 -d $ref.map-ont $ref
+		exec samtools faidx $annotationfile
+		catch_exec minimap2 -x map-ont -k 5 -w 1 -d $annotationfile.map-ont $annotationfile
 	}
 	set root [file root [gzroot [file tail $result]]]
 	set resultdir [file dir $result]
@@ -111,9 +113,9 @@ proc readsaber_job {args} {
 		} -targets {
 			$workdir/$root-$tail.ali.tsv.zst
 		} -vars {
-			fastq ref workdir root tail tempfastq
+			fastq annotationfile workdir root tail tempfastq
 		} -code {
-			catch_exec minimap2 -Y -a -x map-ont -t 4 -n 1 -m 1 -k 5 -w 1 -s 20 $ref $tempfastq \
+			catch_exec minimap2 -Y -a -x map-ont -t 4 -n 1 -m 1 -k 5 -w 1 -s 20 $annotationfile $tempfastq \
 			    | cg zst > $workdir/$root-$tail.ali.sam.zst 2>@ stderr
 			cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.ali.sam.zst | cg select -f {
 				rname="@$qname"
@@ -158,7 +160,7 @@ proc readsaber_job {args} {
 			} -targets {
 				$workdir/$root-$tail.polyt.ali.tsv.zst
 			} -vars {
-				fastq ref refseq workdir root tail tempfastq polyT
+				fastq workdir root tail tempfastq polyT
 			} -code {
 				catch_exec cg zcat $tempfastq | polyt $polyT \
 				    | cg zst > $workdir/$root-$tail.polyt.ali.tsv.temp.zst
@@ -166,17 +168,30 @@ proc readsaber_job {args} {
 			}
 		}
 		set target $workdir/$root-$tail.tsv.zst
-		job readannot_schema-$root-$tail -deps $toadd \
+		job readannot_schema-$root-$tail \
+		-deps [list {*}$toadd $annotationfile] \
 		-targets {
 			$target
 		} -rmtargets {
 			$tempfastq
 		} -vars {
-			fastq ref refseq workdir root tail addsequences ignoreN polyT toadd tempfastq
+			fastq workdir root tail addsequences ignoreN polyT toadd tempfastq completeness annotationfile
 		} -code {
+			# read annotation sizes
+			set f [gzopen $annotationfile]
+			unset -nocomplain minsizea
+			while 1 {
+				if {[gets $f name] == -1} break
+				set name [string range $name 1 end]
+				set seq [gets $f]
+				set size [string length $seq]
+				set minsizea($name) [expr {int($completeness*$size/100.0)}]
+			}
+			gzclose $f
+
 			# file delete $tempfastq
 			set concat $workdir/$root-$tail.concat.ali.tsv.zst
-			if {$refseq ne "" || $polyT} {
+			if {[llength $toadd] > 1} {
 				set tempfile [tempfile]
 				cg cat -m 1 {*}$toadd \
 					| cg select -s {rname rstart rend} | cg zst > $concat.temp.zst
@@ -193,7 +208,7 @@ proc readsaber_job {args} {
 			if {$addsequences} {append oheader \tsequences}
 			puts $o $oheader
 			set header [tsv_open $f]
-			set poss [list_cor $header {rname rstart rend strand chromosome AS ms seq}]
+			set poss [list_cor $header {rname rstart rend strand chromosome AS ms qstart qend seq}]
 			set curname {}
 			set curpos 0
 			set curseq {}
@@ -221,10 +236,8 @@ proc readsaber_job {args} {
 				set schema2 {}
 				set sequences {}
 				set curpos 0
-				foreach {rname rstart rend strand chromosome AS ms seq} [lindex $todo 0] break
+				foreach {rname rstart rend strand chromosome AS ms qstart qend seq} [lindex $todo 0] break
 				set readsize [string length $seq]
-#				# see if we can add polyT/polyA annotations
-#				set locs [regexp -all -indices -inline {AAAAA+|TTTTT+} $seq]
 				# make schema
 				if {$addsequences} {
 					if {$strand eq "-"} {set seq [seq_complement $seq]}
@@ -235,13 +248,15 @@ proc readsaber_job {args} {
 				}
 				# list_subindex $todo 4
 				foreach line $todo {
-					foreach {rname rstart rend strand chromosome AS ms} $line break
-					# putsvars rname rstart rend strand chromosome AS ms
+					foreach {rname rstart rend strand chromosome AS ms qstart qend} $line break
+					# putsvars rname rstart rend strand chromosome AS ms qstart qend
 					if {[regexp ^chr $chromosome]} {
 						set chromosome transcript
 						set strand ~
 					} elseif {[regexp ^transcript $chromosome]} {
 						set strand ~
+					} elseif {[info exists minsizea($chromosome)]} {
+						if {$qend-$qstart < $minsizea($chromosome)} continue
 					}
 					set emptysize [expr {$rstart-$curpos}]
 					if {$emptysize >= $ignoreN} {

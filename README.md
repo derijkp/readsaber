@@ -124,9 +124,15 @@ Possible options are:
 `-addsequences 0/1`
     set to 1 to add sequence data to the per read output file
 
+`-completeness number`
+    annotations/assignments matching less then **number** percent of the annotation sequence are ignored (default 50)
+
+`-ignoreN number`
+    stretches with >= **number** unassigned bases will be indicated with N in the structure (default 3)
+
 `-polyT number`
-    A polyT will only be called by the specific polyT caller if at least **number** Ts (or As) were seen in a stretch
-    set to 0 to not run the specific polyT caller
+    A polyT will only be called by the specific polyT caller if at least **number** Ts (or As) were seen in a stretch (default 7).
+    Set to 0 to not run the specific polyT caller
 
 `-keepintermediate 0/1`
     set to 1 to keep intermediate files for development/debugging
