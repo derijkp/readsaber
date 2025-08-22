@@ -108,7 +108,7 @@ Running readsaber
 -----------------
 You can run readsaber using the following command
 ```
-readsaber ?options? annotationfile result fastq ?fastq? ...
+readsaber ?options? annotationfile resultfile fastq ?fastq? ...
 ```
 This will analyse the data in the given fastq (or unaligned bam) files
 and write the results per read in **result**
@@ -176,8 +176,56 @@ Various **other run options** are
 `-stack`
     set to 1 (default 0) to show an extended stack trace on error (mainly for debugging)
 
-Results
--------
+Resultfile
+----------
+The resultfile given to the commmand is a tab-separated value file with the detected schemas for all (tested) reads.
+This file is mainly for checking in detail. We will typically check the summary files (see next) first (or only).
+Resultfile has the following fields
+
+`rname`
+    read name
+
+`readsize`
+    size of the read
+
+`schema`
+    schema/structure of the read: it consists of a list alternating strand with detected element,e.g.
+    `+ Read1 ~ N + polyT ~ transcript + TSO` where 
+        "Read1" and "TSO" are matches (forward strand) to sequences given in the annotation file.
+        "~ transcript" is a match (spliced alignment) to anywhaer on the first reference genome given (would be "transcript2" for the second, etc.).
+        "~ N" is added when there are >= 'ignoreN' unassigned bases in the stretch
+
+`shortschema`
+    short version of the schema: same there are no 'N's recorded in the structure
+
+`schema2`
+    long version of the schema: all recorded elements have added _<size_of_element>, e.g.
+    `+ Read1_33 ~ N_28 + polyT_9 ~ transcript_91 + TSO_30`
+    
+`sequences`
+    optional field added when `-addsequences 1` is used: the same as schema, but after each element the sequence of the element is added.
+
+Summary files
+--------------
+Readsaber also creates 2 summary files giving a breakdown of the abundance of the different structures/schemas. 
+Their name is based on the the root of the resultfile, with added _summary (before the extension), so e.g. if
+resultfile has a file name "readannot-test.tsv", the summary file will be named "readannot-test_summary.tsv"
+The summary file is a tab-separated value file with the following fields:
+
+`schema`
+    the schema this line is about
+`count`
+    the number of reads that follows this schema
+`percent`
+    the percentage of reads that follows this schema
+`q1_readsize`
+    quartile 1 of readsize (of reads with this schema)
+`avg_readsize`
+    average readsize (of reads with this schema)
+`q3_readsize`
+    quartile 3 of readsize (of reads with this schema)
+
+The file "readannot-test_shortsummary.tsv" is also made, and gives the same information bases on the "shortschema" field
 
 License
 -------
