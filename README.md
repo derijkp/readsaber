@@ -214,14 +214,19 @@ The summary file is a tab-separated value file with the following fields:
 
 `schema`
     the schema this line is about
+
 `count`
     the number of reads that follows this schema
+
 `percent`
     the percentage of reads that follows this schema
+
 `q1_readsize`
     quartile 1 of readsize (of reads with this schema)
+
 `avg_readsize`
     average readsize (of reads with this schema)
+
 `q3_readsize`
     quartile 3 of readsize (of reads with this schema)
 
