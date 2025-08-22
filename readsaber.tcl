@@ -1,3 +1,4 @@
+#!/bin/sh
 # the next line restarts using tclsh \
 exec cg source "$0" "$@"
 
@@ -34,6 +35,7 @@ proc readsaber_job {args} {
 	set ignoreN 3
 	set polyT 7
 	set completeness 50
+	set threads 2
 	if {[lindex $args] in "-h -help help"} {
 		help readsaber
 		exit 0
@@ -48,6 +50,7 @@ proc readsaber_job {args} {
 			set polyT $value
 		}
 		-completeness {set completeness $value}
+		-threads {set threads $value}
 		-version - -V {
 			puts "v0.1.0"
 			exit 0
@@ -90,7 +93,6 @@ proc readsaber_job {args} {
 	set alist {}
 	foreach fastq $fastqs {
 		set tail [file root [gzroot [file tail $fastq]]]
-		set toadd [list $workdir/$root-$tail.ali.tsv.zst]
 		set tempfastq $workdir/$root-$tail.fastq.gz
 		job maketempfastq-$root-$tail -deps {
 			$fastq
@@ -108,23 +110,24 @@ proc readsaber_job {args} {
 			}
 			file rename $tempfastq.temp $tempfastq
 		}
-		job readannot_match-$root-$tail -deps {
+		set toadd [list $workdir/$root-$tail.annot.ali.tsv.zst]
+		job readannot_match-$root-$tail -cores $threads -deps {
 			$tempfastq
 		} -targets {
-			$workdir/$root-$tail.ali.tsv.zst
+			$workdir/$root-$tail.annot.ali.tsv.zst
 		} -vars {
-			fastq annotationfile workdir root tail tempfastq
+			fastq annotationfile workdir root tail tempfastq threads
 		} -code {
-			catch_exec minimap2 -Y -a -x map-ont -t 4 -n 1 -m 1 -k 5 -w 1 -s 20 $annotationfile $tempfastq \
-			    | cg zst > $workdir/$root-$tail.ali.sam.zst 2>@ stderr
-			cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.ali.sam.zst | cg select -f {
+			catch_exec minimap2 -Y -a -x map-ont -t $threads -n 1 -m 1 -k 5 -w 1 -s 20 $annotationfile $tempfastq \
+			    | cg zst > $workdir/$root-$tail.annot.ali.tsv.sam.zst 2>@ stderr
+			cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.annot.ali.tsv.sam.zst | cg select -f {
 				rname="@$qname"
 				{rstart=if($strand eq "+",$qstart,$seqlen - $qend)}
 				{rend=if($strand eq "+",$qend,$seqlen - $qstart)}
 				{size=$qend - $qstart}
 				strand chromosome AS ms begin end mapquality cigar *
-			} | cg select -s {rname rstart rend} | cg zst > $workdir/$root-$tail.ali.tsv.temp.zst
-			file rename -force $workdir/$root-$tail.ali.tsv.temp.zst $workdir/$root-$tail.ali.tsv.zst
+			} | cg select -s {rname rstart rend} | cg zst > $workdir/$root-$tail.annot.ali.tsv.temp.zst
+			file rename -force $workdir/$root-$tail.annot.ali.tsv.temp.zst $workdir/$root-$tail.annot.ali.tsv.zst
 		}
 		set refnr 0
 		foreach refseq $refseqs {
@@ -132,14 +135,14 @@ proc readsaber_job {args} {
 			if {$refnr == 1} {set postfix ""} else {set postfix $refnr}
 			set target $workdir/$root-$tail.refseq$postfix.ali.tsv.zst
 			lappend toadd $target
-			job readannot_match_ref-$root-$tail -mem [map_mem_minimap2 "" 4 map-ont $refseq] -deps {
+			job readannot_match_ref$postfix-$root-$tail -cores $threads -mem [map_mem_minimap2 "" 4 map-ont $refseq] -deps {
 				$refseq $tempfastq
 			} -targets {
 				$target
 			} -vars {
-				fastq ref refseq workdir root tail tempfastq postfix
+				fastq ref refseq workdir root tail tempfastq postfix threads
 			} -code {
-				catch_exec minimap2 -P -Y -a -x map-ont --splice -t 4 $refseq $tempfastq \
+				catch_exec minimap2 -P -Y -a -x map-ont --splice -t $threads $refseq $tempfastq \
 				    | cg zst > $workdir/$root-$tail.refseq$postfix.ali.sam.zst 2>@ stderr
 				cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.refseq$postfix.ali.sam.zst | cg select -f [string_change {
 					rname="@$qname"
@@ -167,7 +170,7 @@ proc readsaber_job {args} {
 				file rename -force $workdir/$root-$tail.polyt.ali.tsv.temp.zst $workdir/$root-$tail.polyt.ali.tsv.zst
 			}
 		}
-		set target $workdir/$root-$tail.tsv.zst
+		set target $workdir/$root-$tail.annot.tsv.zst
 		job readannot_schema-$root-$tail \
 		-deps [list {*}$toadd $annotationfile] \
 		-targets {
@@ -194,9 +197,9 @@ proc readsaber_job {args} {
 			if {[llength $toadd] > 1} {
 				set tempfile [tempfile]
 				cg cat -m 1 {*}$toadd \
-					| cg select -s {rname rstart rend} | cg zst > $concat.temp.zst
+					| cg select -s {rname rstart -rend} | cg zst > $concat.temp.zst
 			} else {
-				cg select -overwrite 1 -s {rname rstart rend} $workdir/$root-$tail.ali.tsv.zst $concat.temp.zst
+				cg select -overwrite 1 -s {rname rstart -rend} $workdir/$root-$tail.annot.ali.tsv.zst $concat.temp.zst
 			}
 			file rename -force $concat.temp.zst $concat
 			set src $concat
@@ -204,7 +207,7 @@ proc readsaber_job {args} {
 			catch {gzclose $f}; catch {gzclose $o}
 			set f [gzopen $src]
 			set o [wgzopen $target.temp.zst]
-			set oheader rname\treadsize\tschema\tschema2
+			set oheader rname\treadsize\tschema\tshortschema\tschema2
 			if {$addsequences} {append oheader \tsequences}
 			puts $o $oheader
 			set header [tsv_open $f]
@@ -233,6 +236,7 @@ proc readsaber_job {args} {
 				if {![llength $todo]} continue
 				# we have a full todo (all hits on one read), process
 				set schema {}
+				set shortschema {}
 				set schema2 {}
 				set sequences {}
 				set curpos 0
@@ -255,7 +259,7 @@ proc readsaber_job {args} {
 						set strand ~
 					} elseif {[regexp ^transcript $chromosome]} {
 						set strand ~
-					} elseif {[info exists minsizea($chromosome)]} {
+					} elseif {[info exists minsizea($chromosome)] && [isint $qstart] && [isint $qend]} {
 						if {$qend-$qstart < $minsizea($chromosome)} continue
 					}
 					set emptysize [expr {$rstart-$curpos}]
@@ -273,6 +277,7 @@ proc readsaber_job {args} {
 					} elseif {$rstart < $curpos} {
 						# overlap
 						lappend schema $strand $chromosome
+						lappend shortschema $strand $chromosome
 						lappend schema2 $strand ${chromosome}_[expr {$rend-$curpos}]
 						if {$addsequences} {
 							lappend sequences $strand ${chromosome} [string range $seq $curpos [expr {$rend-1}]]
@@ -280,6 +285,7 @@ proc readsaber_job {args} {
 					} else {
 						# no overlap, large empty is already done
 						lappend schema $strand $chromosome
+						lappend shortschema $strand $chromosome
 						lappend schema2 $strand ${chromosome}_[expr {$rend-$rstart}]
 						if {$addsequences} {
 							lappend sequences $strand ${chromosome} [string range $seq $rstart [expr {$rend-1}]]
@@ -299,9 +305,9 @@ proc readsaber_job {args} {
 				}
 				# write to output
 				if {$addsequences} {
-					puts $o [string range $curname 1 end]\t$readsize\t[join $schema]\t[join $schema2]\t$sequences
+					puts $o [string range $curname 1 end]\t$readsize\t[join $schema]\t[join $shortschema]\t[join $schema2]\t$sequences
 				} else {
-					puts $o [string range $curname 1 end]\t$readsize\t[join $schema]\t[join $schema2]
+					puts $o [string range $curname 1 end]\t$readsize\t[join $schema]\t[join $shortschema]\t[join $schema2]
 				}
 				set curname $nextrname
 				set curpos 0
@@ -317,6 +323,7 @@ proc readsaber_job {args} {
 	job readannot_merge-[file tail $result] -deps $alist -targets {
 		$result
 		$resultdir/${root}_summary.tsv
+		$resultdir/${root}_shortsummary.tsv
 	} -vars {
 		alist root resultdir result
 	} -code {
@@ -324,6 +331,8 @@ proc readsaber_job {args} {
 		file rename -force $result.temp2 $result
 		cg select -s -count -g schema -gc count,percent,q1(readsize),avg(readsize),q3(readsize) $result > $resultdir/${root}_summary.tsv.temp2
 		file rename -force $resultdir/${root}_summary.tsv.temp2 $resultdir/${root}_summary.tsv
+		cg select -s -count -g shortschema -gc count,percent,q1(readsize),avg(readsize),q3(readsize) $result > $resultdir/${root}_shortsummary.tsv.temp2
+		file rename -force $resultdir/${root}_shortsummary.tsv.temp2 $resultdir/${root}_shortsummary.tsv
 	}
 }
 

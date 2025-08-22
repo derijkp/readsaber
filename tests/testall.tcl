@@ -85,9 +85,11 @@ test readsaber {basic} {
 		-refseq tmp/genome_test \
 		tmp/annot.fa \
 		tmp/readannot-test.tsv \
-		tmp/test1.fastq 2> tmp/test1.log
+		tmp/test1.fastq \
+		2> tmp/test1.log
 	exec diff tmp/readannot-test.tsv data/test1-readannot-test.tsv
 	exec diff tmp/readannot-test_summary.tsv data/test1-readannot-test_summary.tsv
+	exec diff tmp/readannot-test_shortsummary.tsv data/test1-readannot-test_shortsummary.tsv
 } {}
 
 test readsaber {multiple refseq} {
