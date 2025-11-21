@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 		polyTstart = -1 ; polyTend = -1 ; polyTnum = 0 ; polyTgaps = 0 ; polyTpgaps = 0 ; polyTpnum = 0; 
 		polyAstart = -1 ; polyAend = -1 ; polyAnum = 0 ; polyAgaps = 0 ; polyApgaps = 0 ; polyApnum = 0; 
 		/* greedy approach, just streaming the sequence; */
-		/* start at any T ; break of after > 3 diff chars, or 3 successive diff ; only output if >= minT Ts detected */
+		/* start at any T ; break of after > 3 diff chars (reset to 1 after 5 successive Ts), or 3 successive diff ; only output if >= minT Ts detected */
 		/* this will not allways get optimal polyA/T because it simply restarts from where broken of */
 		while (1) {
 			c=getc_unlocked(stdin);

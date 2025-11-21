@@ -119,7 +119,14 @@ results (which you mostly look at) in <result.base>_summary.tsv
 Possible options are:
 `-refseq`
     reference directory with genomesequence, etc. as described previously.
+    Alternatively, you can also give an alignment (bam or cram file) of the reads to the genomic reference if you have already have this
     You can give this option more than once; Annotations from subsequent refdirs are indicated with transcript2, transcript3, etc.
+
+`-refseqannot`
+    by default annotations from subsequent refdirs are indicated with transcript2, transcript3, etc. ('transcript$postfix')
+    Using -refseqannot you can give an alternative value, e.g. 
+        '$chromosome' to show the chromosome the transcript/genomic sequence was found on,
+        'genomic' for allways giving the string genomic (without the numeric postfix)
 
 `-addsequences 0/1`
     set to 1 to add sequence data to the per read output file
@@ -133,6 +140,18 @@ Possible options are:
 `-polyT number`
     A polyT will only be called by the specific polyT caller if at least **number** Ts (or As) were seen in a stretch (default 7).
     Set to 0 to not run the specific polyT caller
+
+`-alimethod string`
+    define the alignment method used for the annotation alignment. A preset can be added using a "_",
+    e.g. the default is minimap2_ontshort for using the minimap2 aligner with the ontshort (minimap2 ont 
+    preset with special options optimized for short matches) preset.
+    For short read data, the method "bwa_short" is advised.
+
+`-refalimethod string`
+    define the alignment method used for the reference alignments. A preset can be added using a "_",
+    e.g. the default is minimap2_splicesens for using the minimap2 aligner with the "splicesens" 
+    preset (minimap2 splice preset with options for extra sensitivity).
+    For short read data, the method "bwa_short" is advised.
 
 `-keepintermediate 0/1`
     set to 1 to keep intermediate files for development/debugging
