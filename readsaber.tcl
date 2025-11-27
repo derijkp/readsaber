@@ -30,7 +30,7 @@ proc readsaber_job {args} {
 	upvar job_logdir job_logdir
 	set cmdline [clean_cmdline cg readsaber {*}$args]
 	set refseqs {}
-	set refseqannot {transcript$postfix}
+	set refseqannots {}
 	set keepintermediate 0
 	set addsequences 0
 	set alimethod minimap2_ontshort
@@ -45,7 +45,7 @@ proc readsaber_job {args} {
 	}
 	cg_options readsaber args {
 		-refseq {lappend refseqs [refseq $value]}
-		-refseqannot {set refseqannot $value}
+		-refseqannot {lappend refseqannots $value}
 		-alimethod {set alimethod $value}
 		-refalimethod {set refalimethod $value}
 		-keepintermediate {set keepintermediate $value}
@@ -70,6 +70,13 @@ proc readsaber_job {args} {
 	set fastqs [list [file_absolute $fastq]]
 	foreach fastq $args {
 		lappend fastqs [file_absolute $fastq]
+	}
+	set len [llength $refseqs]
+	set lena [llength $refseqannots]
+	if {$lena < $len} {
+		lappend refseqannots {*}[list_fill [expr {$len-$lena}] {transcript$postfix}]
+	} elseif {$lena > $len} {
+		set refseqannots [lrange $refseqannots 0 [expr {$len-1}]]
 	}
 	# index annotationfile
 #	job readannot_index-[file tail $annotationfile] -deps {
@@ -144,7 +151,7 @@ proc readsaber_job {args} {
 			file rename -force $workdir/$root-$tail.annot.ali.tsv.temp.zst $workdir/$root-$tail.annot.ali.tsv.zst
 		}
 		set refnr 0
-		foreach refseq $refseqs {
+		foreach refseq $refseqs refseqannot $refseqannots {
 			incr refnr
 			if {$refnr == 1} {set postfix ""} else {set postfix $refnr}
 			set target $workdir/$root-$tail.refseq$postfix.ali.tsv.zst
@@ -271,6 +278,7 @@ proc readsaber_job {args} {
 				set sequences {}
 				set curpos 0
 				foreach {rname rstart rend strand chromosome AS ms qstart qend seq} [lindex $todo 0] break
+				# if {$rname eq "@SRR22027555.1722"} error
 				set readsize [string length $seq]
 				if {$readsize == 0} {
 					set seq [lindex [list_sub $todo -exclude [list_find [list_subindex $todo 4] polyT]] 0 9]

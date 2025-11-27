@@ -127,6 +127,7 @@ Possible options are:
     Using -refseqannot you can give an alternative value, e.g. 
         '$chromosome' to show the chromosome the transcript/genomic sequence was found on,
         'genomic' for allways giving the string genomic (without the numeric postfix)
+    You can give this option more than once.
 
 `-addsequences 0/1`
     set to 1 to add sequence data to the per read output file
