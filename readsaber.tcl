@@ -272,6 +272,10 @@ proc readsaber_job {args} {
 				set curpos 0
 				foreach {rname rstart rend strand chromosome AS ms qstart qend seq} [lindex $todo 0] break
 				set readsize [string length $seq]
+				if {$readsize == 0} {
+					set seq [lindex [list_sub $todo -exclude [list_find [list_subindex $todo 4] polyT]] 0 9]
+					set readsize [string length $seq]
+				}
 				# make schema
 				if {$addsequences} {
 					if {$strand eq "-"} {set seq [seq_complement $seq]}
