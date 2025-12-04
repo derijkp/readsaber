@@ -1,6 +1,9 @@
 shortschema	count	percent	q1_readsize	avg_readsize	q3_readsize
-+ polyT	2	28.5714	17	30.0	43
-+ Read1 + polyT ~ transcript + TSO	2	28.5714	162	163.5	165
-	1	14.2857	15.0	15.0	15.0
-+ polyT + polyT	1	14.2857	41.0	41.0	41.0
-+ Read1 + polyT + TSO	1	14.2857	194.0	194.0	194.0
++ Read1 + polyT ~ transcript + TSO	2	20	162	163.5	165
++ Read1 + Read1 + polyT ~ transcript + TSO	2	20	251	252.0	253
+	1	10	15.0	15.0	15.0
++ polyT	1	10	17.0	17.0	17.0
++ polyT - polyT	1	10	43.0	43.0	43.0
++ polyT + polyT	1	10	41.0	41.0	41.0
++ Read1 + polyT + TSO	1	10	194.0	194.0	194.0
++ Read1 + polyT ~ transcript ~ transcript	1	10	232.0	232.0	232.0

@@ -79,7 +79,7 @@ test readsaber {basic} {
 	exec readsaber_makerefdir tmp/genome_test data/genome_test.fa 2> tmp/test1_makeref.log
 	file copy ../annotations/annotations_ontr10x.fa tmp/annot.fa
 	file copy data/test1.fastq tmp/test1.fastq
-	exec readsaber \
+	exec readsaber -stack 1 \
 		-keepintermediate 1 \
 		-addsequences 1 \
 		-refseq tmp/genome_test \
