@@ -78,17 +78,6 @@ proc readsaber_job {args} {
 	} elseif {$lena > $len} {
 		set refseqannots [lrange $refseqannots 0 [expr {$len-1}]]
 	}
-	# index annotationfile
-#	job readannot_index-[file tail $annotationfile] -deps {
-#		$annotationfile
-#	} -targets {
-#		$annotationfile.map-ont
-#	} -vars {
-#		annotationfile
-#	} -code {
-#		exec samtools faidx $annotationfile
-#		catch_exec minimap2 -x map-ont -k 5 -w 1 -d $annotationfile.map-ont $annotationfile
-#	}
 	set root [file root [gzroot [file tail $result]]]
 	set resultdir [file dir $result]
 	job_logfile [file dir $result]/sc_readsaber-[file tail $result] [file dir $result] $cmdline \
@@ -97,6 +86,12 @@ proc readsaber_job {args} {
 	set method $alimethod ; set alipreset {}
 	regexp {(^[^_]+)_(.*)$} $alimethod temp alimethod alipreset
 	set annotrefseq [refseq_${alimethod}_job $annotationfile $alipreset]
+	set refalipreset {}
+	regexp {(^[^_]+)_(.*)$} $refalimethod temp refalimethod refalipreset
+	unset -nocomplain refa
+	foreach refseq $refseqs refseqannot $refseqannots {
+		set refa($refseq) [refseq_${refalimethod}_job $refseq $refalipreset]
+	}
 
 	# mapping
 	set workdir [gzroot $result].temp
@@ -108,6 +103,7 @@ proc readsaber_job {args} {
 		job_cleanup_add_shadow $workdir
 	}
 	set alist {}
+
 	foreach fastq $fastqs {
 		set tail [file root [gzroot [file tail $fastq]]]
 		set tempfastq $workdir/$root-$tail.fastq.gz
@@ -139,7 +135,7 @@ proc readsaber_job {args} {
 		} -targets {
 			$workdir/$root-$tail.annot.ali.tsv.zst
 		} -vars {
-			fastq annotationfile workdir root tail tempfastq threads
+			fastq workdir root tail tempfastq threads
 		} -code {
 			cg sam2tsv -f {AS ms cs} $workdir/$root-$tail.annot.ali.tsv.sam.zst | cg select -f {
 				rname="@$qname"
@@ -163,9 +159,6 @@ proc readsaber_job {args} {
 				set useali $refseq
 			} else {
 				set useali $workdir/$root-$tail.refseq$postfix.ali.sam.zst
-				set method $refalimethod ; set refalipreset {}
-				regexp {(^[^_]+)_(.*)$} $refalimethod temp refalimethod refalipreset
-				refseq_${refalimethod}_job $refseq $refalipreset
 				map_job -nohardclips 1 -paired 0 -threads $threads \
 					-method $refalimethod -preset $refalipreset \
 					$useali \

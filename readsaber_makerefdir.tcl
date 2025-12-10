@@ -140,6 +140,7 @@ proc readsaber_makerefdir {args} {
 		# minimap2_splice index
 		puts "Making minimap2 ont index (can take large amount of memory)"
 		catch_exec cg refseq_minimap2 $result splice
+		catch_exec cg refseq_minimap2 $result splicesens
 	}
 
 	if {$pacbioindex} {
