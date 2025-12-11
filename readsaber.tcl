@@ -272,13 +272,24 @@ proc readsaber_job {args} {
 				#
 				# we have a full todo (all hits on one read), process
 				# get sequence from first (if it does not have sequence, from another)
-				foreach {rname rstart rend strand chromosome qstart qend seq priority} [lindex $todo 0] break
-				# if {$curname eq "@seq5"} error
+				foreach {rname rstart rend seqstrand chromosome qstart qend seq priority} [lindex $todo 0] break
+# if {$curname eq "@bd6f13c0-9e0d-4ff4-9841-6cb59fe6dbd4"} error
 				set readsize [string length $seq]
 				if {$readsize == 0} {
-					set seq [lindex [list_sub $todo -exclude [list_find [list_subindex $todo 4] polyT]] 0 9]
+					set sline [lindex [list_sub $todo -exclude [list_find [list_subindex $todo 4] polyT]] 0]
+					set seq [lindex $sline 9]
+					set seqstrand [lindex $sline 3]
 					set readsize [string length $seq]
 				}
+				if {$seqstrand eq "+"} {
+					set seqa(+) $seq
+					set seqa(-) [seq_complement $seq]
+				} else {
+					set seqa(-) $seq
+					set seqa(+) [seq_complement $seq]
+				}
+				set seqa(~) $seqa(+)
+				set seqa() $seqa(+)
 				# remove unaligned
 				set pos [lsearch -exact [list_subindex $todo 4] *]
 				if {$pos != -1} {
@@ -325,7 +336,7 @@ proc readsaber_job {args} {
 							set Nsize 0
 						} else {
 							if {$Nsize >= $ignoreN} {
-								set Nstring [string range $seq $pend [expr {$rstart-1}]]
+								set Nstring [string range $seqa($pstrand) $pend [expr {$rstart-1}]]
 							}
 						}
 						if {$ppriority ne "0"} {
@@ -333,7 +344,7 @@ proc readsaber_job {args} {
 							lappend shortschema $pstrand $pchromosome
 							lappend schema2 $pstrand ${pchromosome}_[expr {$pend-$pstart}]
 							if {$addsequences} {
-								lappend sequences $pstrand ${pchromosome} [string range $seq $pstart [expr {$pend-1}]]
+								lappend sequences $pstrand ${pchromosome} [string range $seqa($pstrand) $pstart [expr {$pend-1}]]
 							}
 						}
 						if {$Nsize >= $ignoreN} {
@@ -355,7 +366,7 @@ proc readsaber_job {args} {
 					lappend shortschema $pstrand $pchromosome
 					lappend schema2 $pstrand ${pchromosome}_[expr {$pend-$pstart}]
 					if {$addsequences} {
-						lappend sequences $pstrand ${pchromosome} [string range $seq $pstart [expr {$pend-1}]]
+						lappend sequences $pstrand ${pchromosome} [string range $seqa($pstrand) $pstart [expr {$pend-1}]]
 					}
 				}
 				# add empty if there are left
@@ -365,7 +376,7 @@ proc readsaber_job {args} {
 					lappend schema ~ N
 					lappend schema2 ~ N_$remainder
 					if {$addsequences} {
-						lappend sequences ~ N [string range $seq $pend end]
+						lappend sequences ~ N [string range $seqa($pstrand) $pend end]
 					}							
 				}
 				# write to output
