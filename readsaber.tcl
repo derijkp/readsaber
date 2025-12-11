@@ -25,6 +25,10 @@ proc help_get {action} {
 	return $help
 }
 
+proc shortenname {string} {
+	join [list_remdup [split $string _-]] _
+}
+
 # main proc, using job system
 proc readsaber_job {args} {
 	upvar job_logdir job_logdir
@@ -106,6 +110,9 @@ proc readsaber_job {args} {
 
 	foreach fastq $fastqs {
 		set tail [file root [gzroot [file tail $fastq]]]
+		if {[string length $root-$tail.polyt.ali.tsv.temp.zst] >= 252} {
+			set tail [shortenname $tail]
+		}
 		set tempfastq $workdir/$root-$tail.fastq.gz
 		job maketempfastq-$root-$tail -deps {
 			$fastq
