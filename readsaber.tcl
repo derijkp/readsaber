@@ -49,7 +49,7 @@ proc readsaber_job {args} {
 	}
 	cg_options readsaber args {
 		-refseq {lappend refseqs [refseq $value]}
-		-refseqannot {lappend refseqannots $value}
+		-refseqannot - -refseqname {lappend refseqannots $value}
 		-alimethod {set alimethod $value}
 		-refalimethod {set refalimethod $value}
 		-keepintermediate {set keepintermediate $value}
