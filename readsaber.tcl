@@ -124,7 +124,7 @@ proc readsaber_job {args} {
 			if {[file extension $fastq] eq ".bam"} {
 				catch_exec samtools fastq -T "RG,CB,QT,MI,MM,ML,Mm,Ml" $fastq | cg bgzip > $tempfastq.temp
 			} elseif {[file extension $fastq] eq ".gz"} {
-				mklink $fastq $tempfastq.temp
+				mklink -absolute 1 $fastq $tempfastq.temp
 			} else {
 				catch_exec cg bgzip -o $tempfastq.temp $fastq
 			}
