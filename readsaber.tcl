@@ -155,6 +155,22 @@ proc readsaber_job {args} {
 			file rename -force $workdir/$root-$tail.annot.ali.tsv.temp.zst $workdir/$root-$tail.annot.ali.tsv.zst
 		}
 		set priority 1
+		if {$polyT} {
+			incr priority
+			lappend toadd $workdir/$root-$tail.polyt.ali.tsv.zst
+			job readannot_polyt-$root-$tail -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst -deps {
+				$tempfastq
+			} -targets {
+				$workdir/$root-$tail.polyt.ali.tsv.zst
+			} -vars {
+				fastq workdir root tail tempfastq polyT priority
+			} -code {
+				catch_exec cg zcat $tempfastq | polyt $polyT \
+					| cg select -f [list * "priority=$priority"] \
+					| cg zst > $workdir/$root-$tail.polyt.ali.tsv.temp.zst
+				file rename -force $workdir/$root-$tail.polyt.ali.tsv.temp.zst $workdir/$root-$tail.polyt.ali.tsv.zst
+			}
+		}
 		set refnr 0
 		foreach refseq $refseqs refseqannot $refseqannots {
 			incr priority
@@ -194,22 +210,6 @@ proc readsaber_job {args} {
 					| cg select -s {rname rstart rend} \
 					| cg zst > $target.temp.zst
 				file rename -force $target.temp.zst $target
-			}
-		}
-		if {$polyT} {
-			incr priority
-			lappend toadd $workdir/$root-$tail.polyt.ali.tsv.zst
-			job readannot_polyt-$root-$tail -deps {
-				$tempfastq
-			} -targets {
-				$workdir/$root-$tail.polyt.ali.tsv.zst
-			} -vars {
-				fastq workdir root tail tempfastq polyT priority
-			} -code {
-				catch_exec cg zcat $tempfastq | polyt $polyT \
-					| cg select -f [list * "priority=$priority"] \
-					| cg zst > $workdir/$root-$tail.polyt.ali.tsv.temp.zst
-				file rename -force $workdir/$root-$tail.polyt.ali.tsv.temp.zst $workdir/$root-$tail.polyt.ali.tsv.zst
 			}
 		}
 		set target $workdir/$root-$tail.annot.tsv.zst
