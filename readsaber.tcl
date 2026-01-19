@@ -108,13 +108,14 @@ proc readsaber_job {args} {
 	}
 	set alist {}
 
+	set endtargets [list $result $resultdir/${root}_summary.tsv $resultdir/${root}_shortsummary.tsv]
 	foreach fastq $fastqs {
 		set tail [file root [gzroot [file tail $fastq]]]
 		if {[string length $root-$tail.polyt.ali.tsv.temp.zst] >= 252} {
 			set tail [shortenname $tail]
 		}
 		set tempfastq $workdir/$root-$tail.fastq.gz
-		job maketempfastq-$root-$tail -deps {
+		job maketempfastq-$root-$tail -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst -deps {
 			$fastq
 		} -targets {
 			$tempfastq
@@ -131,13 +132,14 @@ proc readsaber_job {args} {
 			file rename $tempfastq.temp $tempfastq
 		}
 		set toadd [list $workdir/$root-$tail.annot.ali.tsv.zst]
-		map_job -nohardclips 1 -paired 0 -threads $threads \
+		map_job -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst \
+			-nohardclips 1 -paired 0 -threads $threads \
 			-method $alimethod -preset $alipreset \
 			$workdir/$root-$tail.annot.ali.tsv.sam.zst \
 			$annotationfile \
 			annotation \
 			$tempfastq
-		job readannot_match-$root-$tail -cores $threads -deps {
+		job readannot_match-$root-$tail -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst -cores $threads -deps {
 			$workdir/$root-$tail.annot.ali.tsv.sam.zst
 		} -targets {
 			$workdir/$root-$tail.annot.ali.tsv.zst
@@ -181,15 +183,16 @@ proc readsaber_job {args} {
 			if {[file extension $refseq] in ".cram .bam .sam"} {
 				set useali $refseq
 			} else {
-				set useali $workdir/$root-$tail.refseq$postfix.ali.sam.zst
-				map_job -nohardclips 1 -paired 0 -threads $threads \
+				set useali $workdir/$root-$tail.refseq$postfix.${refalimethod}_$refalipreset.ali.sam.zst
+				map_job -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst \
+					-nohardclips 1 -paired 0 -threads $threads \
 					-method $refalimethod -preset $refalipreset \
 					$useali \
 					$refseq \
 					refseq$postfix \
 					$tempfastq
 			}
-			job readannot_match_ref$postfix-$root-$tail -deps {
+			job readannot_match_ref$postfix-$root-$tail -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst -deps {
 				$useali
 			} -targets {
 				$target
