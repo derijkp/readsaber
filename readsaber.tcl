@@ -40,6 +40,7 @@ proc readsaber_job {args} {
 	set alimethod minimap2_ontshort
 	set refalimethod minimap2_splicesens
 	set ignoreN 3
+	set refminsize 7
 	set polyT 7
 	set completeness 50
 	set threads 2
@@ -52,6 +53,7 @@ proc readsaber_job {args} {
 		-refseqannot - -refseqname {lappend refseqannots $value}
 		-alimethod {set alimethod $value}
 		-refalimethod {set refalimethod $value}
+		-refminsize {set refminsize $value}
 		-keepintermediate {set keepintermediate $value}
 		-addsequences {set addsequences $value}
 		-ignoreN {set ignoreN $value}
@@ -135,6 +137,7 @@ proc readsaber_job {args} {
 		map_job -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst \
 			-nohardclips 1 -paired 0 -threads $threads \
 			-method $alimethod -preset $alipreset \
+			-sort nosort \
 			$workdir/$root-$tail.annot.ali.tsv.sam.zst \
 			$annotationfile \
 			annotation \
@@ -153,12 +156,11 @@ proc readsaber_job {args} {
 				{size=$qend - $qstart}
 				strand chromosome AS ms begin end mapquality cigar *
 				{priority=1}
-			} | cg select -s {rname rstart rend} | cg zst > $workdir/$root-$tail.annot.ali.tsv.temp.zst
+			} | cg zst > $workdir/$root-$tail.annot.ali.tsv.temp.zst
 			file rename -force $workdir/$root-$tail.annot.ali.tsv.temp.zst $workdir/$root-$tail.annot.ali.tsv.zst
 		}
-		set priority 1
+		set priority 2
 		if {$polyT} {
-			incr priority
 			lappend toadd $workdir/$root-$tail.polyt.ali.tsv.zst
 			job readannot_polyt-$root-$tail -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst -deps {
 				$tempfastq
@@ -187,6 +189,7 @@ proc readsaber_job {args} {
 				map_job -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst \
 					-nohardclips 1 -paired 0 -threads $threads \
 					-method $refalimethod -preset $refalipreset \
+					-sort nosort \
 					$useali \
 					$refseq \
 					refseq$postfix \
@@ -210,20 +213,37 @@ proc readsaber_job {args} {
 					AS ms begin end mapquality cigar *
 					{priority=@priority@}
 				} [list @ANNOT@ $refseqannot @POSTFIX@ $postfix @priority@ $priority] ] -q {$chromosome ne "*"} \
-					| cg select -s {rname rstart rend} \
 					| cg zst > $target.temp.zst
 				file rename -force $target.temp.zst $target
 			}
 		}
+		set concat $workdir/$root-$tail.concat.ali.tsv.zst
+		job readannot_concat-$root-$tail -skip $endtargets \
+		-deps $toadd \
+		-targets {
+			$concat
+		} -vars {
+			toadd concat
+		} -code {
+			if {[llength $toadd] > 1} {
+				set tempfile [tempfile]
+				cg cat -m 1 {*}$toadd \
+					| cg select -s {rname rstart -rend} | cg zst > $concat.temp.zst
+			} else {
+				cg select -overwrite 1 -s {rname rstart -rend} $workdir/$root-$tail.annot.ali.tsv.zst $concat.temp.zst
+			}
+			file rename -force $concat.temp.zst $concat
+		}
+
 		set target $workdir/$root-$tail.annot.tsv.zst
 		job readannot_schema-$root-$tail \
-		-deps [list {*}$toadd $annotationfile] \
+		-deps [list {*}$concat $annotationfile] \
 		-targets {
 			$target
 		} -rmtargets {
 			$tempfastq
 		} -vars {
-			fastq workdir root tail addsequences ignoreN polyT toadd tempfastq completeness annotationfile
+			concat addsequences ignoreN polyT completeness annotationfile refminsize
 		} -code {
 			# read annotation sizes
 			set f [gzopen $annotationfile]
@@ -238,15 +258,6 @@ proc readsaber_job {args} {
 			gzclose $f
 
 			# file delete $tempfastq
-			set concat $workdir/$root-$tail.concat.ali.tsv.zst
-			if {[llength $toadd] > 1} {
-				set tempfile [tempfile]
-				cg cat -m 1 {*}$toadd \
-					| cg select -s {rname rstart -rend} | cg zst > $concat.temp.zst
-			} else {
-				cg select -overwrite 1 -s {rname rstart -rend} $workdir/$root-$tail.annot.ali.tsv.zst $concat.temp.zst
-			}
-			file rename -force $concat.temp.zst $concat
 			set src $concat
 
 			catch {gzclose $f}; catch {gzclose $o}
@@ -256,23 +267,27 @@ proc readsaber_job {args} {
 			if {$addsequences} {append oheader \tsequences}
 			puts $o $oheader
 			set header [tsv_open $f]
-			set poss [list_cor $header {rname rstart rend strand chromosome qstart qend seq priority}]
+			set poss [list_cor $header {rstart rend strand chromosome qstart qend priority seq}]
+			set rnamepos [lsearch $header rname]
 			set curname {}
 			set curpos 0
 			set curseq {}
 			set todo {}
 			if {[gets $f line] == -1} {error "error reading $src: no data"}
-			set data [list_sub [split $line \t] $poss]
+			set split [split $line \t]
+			set data [list_sub $split $poss]
 			set todo [list $data]
-			set curname [lindex $data 0]
+			set curname [lindex $split $rnamepos]
 			set lastone 0
+
 			while 1 {
 				if {[gets $f line] == -1} {
 					if {$lastone} break
 					set lastone 1
 				}
-				set nextdata [list_sub [split $line \t] $poss]
-				set nextrname [lindex $nextdata 0]
+				set split [split $line \t]
+				set nextdata [list_sub $split $poss]
+				set nextrname [lindex $split $rnamepos]
 				# foreach {rname rstart rend strand chromosome seq} $data break
 				if {$nextrname eq $curname} {
 					lappend todo $nextdata
@@ -282,41 +297,61 @@ proc readsaber_job {args} {
 				#
 				# we have a full todo (all hits on one read), process
 				# get sequence from first (if it does not have sequence, from another)
-				foreach {rname rstart rend seqstrand chromosome qstart qend seq priority} [lindex $todo 0] break
-# if {$curname eq "@bd6f13c0-9e0d-4ff4-9841-6cb59fe6dbd4"} error
+				foreach {rstart rend seqstrand chromosome qstart qend seq priority} [lindex $todo 0] break
+				#
+# if {$curname eq "@seq7"} {error testing_interrupt}
+				# find a non-empty sequence
+				# -------------------------
+				set seqs [list_subindex $todo 7]
+				set strands [list_subindex $todo 2]
+				foreach seq $seqs strand $strands {
+					if {$seq ni {* {}}} break
+				}
+				if {$strand eq "-"} {
+					set seq [seq_complement $seq]
+				}
+				# recalculate rstart and rend where needed (* sequence was given in alignment)
+				# ----------------------------------------
 				set readsize [string length $seq]
-				if {$readsize == 0} {
-					set sline [lindex [list_sub $todo -exclude [list_find [list_subindex $todo 4] polyT]] 0]
-					set seq [lindex $sline 9]
-					set seqstrand [lindex $sline 3]
-					set readsize [string length $seq]
+				if {"*" in $seqs} {
+					set pos 0
+					set changes 0
+					foreach oseq $seqs strand $strands {
+						if {$oseq eq "*" && $strand eq "-"} {
+							set line [lindex $todo $pos]
+							set rstart [expr {$readsize - [lindex $line 5]}]
+							set rend [expr {$readsize - [lindex $line 4]}]
+							lset line 0 $rstart
+							lset line 1 $rend
+							lset todo $pos $line
+							incr changes
+						}
+						incr pos
+					}
+					if {$changes} {
+						set todo [lsort -index 0 -integer [lsort -index 1 -integer -decreasing $todo]]
+					}
 				}
-				if {$seqstrand eq "+"} {
-					set seqa(+) $seq
-					set seqa(-) [seq_complement $seq]
-				} else {
-					set seqa(-) $seq
-					set seqa(+) [seq_complement $seq]
-				}
-				set seqa(~) $seqa(+)
-				set seqa() $seqa(+)
 				# remove unaligned
-				set pos [lsearch -exact [list_subindex $todo 4] *]
+				set pos [lsearch -exact [list_subindex $todo 3] *]
 				if {$pos != -1} {
 					set todo [list_sub $todo -exclude $pos]
 				}
 
+				#
+				# cut overlaps (store in annots)
+				# ------------
 				# list_subindex $todo 4
-				# make schema
-				set schema {}
-				set shortschema {}
-				set schema2 {}
-				set sequences {}
+				set annots {}
 				set curpos 0
 				# go over (sorted) todo
-				foreach {pname pstart pend pstrand pchromosome pqstart pqend ppriority} {{} 0 0 {} {} 0 0 0} break
-				foreach line $todo {
-					foreach {rname rstart rend strand chromosome qstart qend temp priority} $line break
+				foreach {pstart pend pstrand pchromosome pqstart pqend ppriority} {0 0 {} {} 0 0 0} break
+				set pos 0
+				set len [llength $todo]
+				while {$pos < $len} {
+					set line [lindex $todo $pos]
+					incr pos
+					foreach {rstart rend strand chromosome qstart qend priority} $line break
 					# putsvars rname rstart rend strand chromosome qstart qend
 					if {[regexp ^chr $chromosome]} {
 						# set chromosome transcript
@@ -326,6 +361,7 @@ proc readsaber_job {args} {
 					} elseif {[info exists minsizea($chromosome)] && [isint $qstart] && [isint $qend]} {
 						if {$qend-$qstart < $minsizea($chromosome)} continue
 					}
+# if {$chromosome eq "polyT"} error
 					# putsvars sequences line chromosome pchromosome strand pstrand ppriority priority rstart rend pstart pend
 					set Nsize [expr {$rstart-$pend}]
 					if {$chromosome eq $pchromosome && $strand eq $pstrand && $Nsize <= $ignoreN && $ppriority != 1 && $priority != 1} {
@@ -334,7 +370,28 @@ proc readsaber_job {args} {
 						# annot will always be separated (to allow finding duplicate annots)
 						set pend $rend
 					} elseif {$rend <= $pend} {
-						# ignore full overlap
+						# ignore full overlap unless it is higher priority
+						if {$priority < $ppriority} {
+							if {$chromosome eq "polyT" && [expr {$rstart-$pstart}] >= 2 && [expr {$pend-$rend}] >= 2} {
+								# special case: a polyT in the middle of a transcript is ignored
+								# but is kept if it is at the ends
+							} else {
+								if {$pend > $rend} {
+									set temp [list [list $rend $pend $pstrand $pchromosome {} {} [expr {$pend - $rend}] $ppriority] \
+										{*}[lrange $todo $pos end]]
+									set temp [lsort -index 0 -integer [lsort -index 1 -integer -decreasing $temp]]
+									set todo [list {*}[lrange $todo 0 [expr {$pos-1}]] {*}$temp]
+								}
+								set psize [expr {$rstart-$pstart}]
+								if {$psize > 0} {
+									if {$ppriority > 2 && $psize < $refminsize} {set pchromosome N ; set pstrand ~}
+									lappend annots [list $pstart $rstart $pstrand $psize $pchromosome $ppriority]
+								}
+								set pend $rstart
+								foreach {pstart pend pstrand pchromosome pqstart pqend ppriority} \
+									[list $rstart $rend $strand $chromosome $qstart $qend $priority] break
+							}
+						}
 					} else {
 						if {$rstart < $pend} {
 							# overlap 
@@ -346,49 +403,87 @@ proc readsaber_job {args} {
 							set Nsize 0
 						} else {
 							if {$Nsize >= $ignoreN} {
-								set Nstring [string range $seqa($pstrand) $pend [expr {$rstart-1}]]
+								set Nstring [string range $seq $pend [expr {$rstart-1}]]
 							}
 						}
 						if {$ppriority ne "0"} {
-							lappend schema $pstrand $pchromosome
-							lappend shortschema $pstrand $pchromosome
-							lappend schema2 $pstrand ${pchromosome}_[expr {$pend-$pstart}]
-							if {$addsequences} {
-								lappend sequences $pstrand ${pchromosome} [string range $seqa($pstrand) $pstart [expr {$pend-1}]]
+							set psize [expr {$pend-$pstart}]
+							if {$psize > 0} {
+								if {$ppriority > 2 && $psize < $refminsize} {set pchromosome N ; set pstrand ~}
+								lappend annots [list $pstart $pend $pstrand $psize $pchromosome $ppriority]
 							}
 						}
-						if {$Nsize >= $ignoreN} {
-							lappend schema ~ N
-							lappend schema2 ~ N_$Nsize
-							if {$addsequences} {
-								lappend sequences ~ N $Nstring
-							}
+						if {$Nsize > 0} {
+							lappend annots [list $pend $rstart ~ $Nsize N]
 						}
-						foreach {pname pstart pend pstrand pchromosome pqstart pqend ppriority} \
-							[list $rname $rstart $rend $strand $chromosome $qstart $qend $priority] break
+						foreach {pstart pend pstrand pchromosome pqstart pqend ppriority} \
+							[list $rstart $rend $strand $chromosome $qstart $qend $priority] break
 					}
 					set ppriority $priority
 				}
-
 				# Add previous (lagging)
-				if {[llength $todo]} {
-					lappend schema $pstrand $pchromosome
-					lappend shortschema $pstrand $pchromosome
-					lappend schema2 $pstrand ${pchromosome}_[expr {$pend-$pstart}]
-					if {$addsequences} {
-						lappend sequences $pstrand ${pchromosome} [string range $seqa($pstrand) $pstart [expr {$pend-1}]]
-					}
+				set psize [expr {$pend-$pstart}]
+				if {$psize > 0} {
+					if {$ppriority > 2 && $psize < $refminsize} {set pchromosome N ; set pstrand ~}
+					lappend annots [list $pstart $pend $pstrand $psize $pchromosome $ppriority]
 				}
 				# add empty if there are left
 				set clen [string length $seq]
 				set remainder [expr {$clen-$pend}]
-				if {$remainder > 3} {
-					lappend schema ~ N
-					lappend schema2 ~ N_$remainder
-					if {$addsequences} {
-						lappend sequences ~ N [string range $seqa($pstrand) $pend end]
-					}							
+				if {$remainder > 0} {
+					lappend annots [list $pend $clen ~ $remainder N]
 				}
+				# join $annots \n
+				#
+				# join Ns in annots (some created from ref)
+				# -----------------
+				set temp {}
+				set pline {}
+				set ptype {}
+				foreach line $annots {
+					set type [lindex $line 4]
+					if {$type eq "N"} {
+						if {$ptype eq "N"} {
+							set nend [lindex $line 1]
+							lset pline 1 $nend
+							lset pline 3 [expr {$nend - [lindex $pline 0]}]
+						} else {
+							set pline $line ; set ptype N
+						}
+					} else {
+						if {[llength $pline]} {
+							lappend temp $pline
+							set pline {}
+						}
+						lappend temp $line
+					}
+					set ptype $type
+				}
+				if {[llength $pline]} {lappend temp $pline}
+				set annots $temp
+				# join $annots \n
+				#
+				# make schemas
+				# ------------
+				set schema {}
+				set shortschema {}
+				set schema2 {}
+				set sequences {}
+				foreach line $annots {
+					foreach {start end strand size chromosome priority} $line break
+					if {$chromosome ne "N" || $size >= $ignoreN} {
+						lappend schema $strand $chromosome
+					}
+					if {$chromosome ne "N"} {
+						lappend shortschema $strand $chromosome
+					}
+					lappend schema2 $strand ${chromosome}_$size
+					if {$addsequences} {
+						lappend sequences $strand ${chromosome} [string range $seq $start [expr {$end-1}]]
+					}
+				}
+				# putsvars schema schema2 shortschema sequences
+				#
 				# write to output
 				if {$addsequences} {
 					puts $o [string range $curname 1 end]\t$readsize\t[join $schema]\t[join $shortschema]\t[join $schema2]\t$sequences

@@ -5,7 +5,7 @@ readsaber ?options? annotationfile result fastq ?fastq? ...
 
 == Description ==
 readsaber annotates the reads in fastq files with the sequences given in annotationfile.
-It will create a read structure schema per read, which consists of a list of annotations as found in read. 
+It will create a read structure schema per read, which consists of a list of annotations as found in the read. 
 For each annotation (sequence found in the read) the following elements are added in the schema:
 * strand: strand the annotation is found in, is + or -, or ~ for unknown/irrelevant
 * annotation_name: This is the name of the annotation sequence in the fasta file. Keep these names short for better overview
@@ -76,12 +76,24 @@ will be annotated as "transcript".
 
 == Options ==
 ; -refseq file/dir: file or directory containing a reference genome sequence, you can give this options multiple times
+; -refseqannot: by default annotations from subsequent refdirs are indicated with transcript2, transcript3, etc. ('transcript$postfix')
+    Using -refseqannot you can give an alternative value, e.g. '$chromosome' to show the chromosome the transcript/genomic sequence was found on,
+    'genomic' for allways giving the string genomic (without the numeric postfix)
+    You can give this option more than once.
 ; -addsequences 0/1: set to 1 to add sequence data to the per read output file
 ; -keepintermediate 0/1: set to 1 to keep intermediate files for development/debugging
 ; -completeness number: annotations/assignments matching less then **number** percent of the annotation sequence are ignored (default 50)
 ; -ignoreN number: stretches with >= **number** unassigned bases will be indicated with N in the structure (default 3)
 ; -polyT number: A polyT will only be called by the specific polyT caller if at least **number** Ts (or As) were seen in a stretch (default 7).
    Set to 0 to not run the specific polyT caller
+; -alimethod string: define the alignment method used for the annotation alignment. A preset can be added using a "_", e.g.
+    the default is minimap2_ontshort for using the minimap2 aligner with the ontshort (minimap2 ont preset with special options optimized for short matches) preset.
+    For short read data, the method "bwa_short" is advised.
+; -refalimethod string: define the alignment method used for the reference alignments. A preset can be added using a "_", e.g. 
+    the default is minimap2_splicesens for using the minimap2 aligner with the "splicesens" preset (minimap2 splice preset with options for extra sensitivity).
+    For short read data, the method "bwa_short" is advised.
+: -refminsize integer: (remaining) reference annotations smaller than the given number are ignored (annotated as N). (default 7)
+; -keepintermediate 0/1: set to 1 to keep intermediate files for development/debugging
 
 The command supports analysing fastqs/ubams in parallel using [[joboptions]], e.g. adding -d <number> will analyse each fastq on
 a separate core on the local server with a maximum of <number> cores.

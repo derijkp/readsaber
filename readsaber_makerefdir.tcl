@@ -32,6 +32,7 @@ proc readsaber_makerefdir {args} {
 	set organelles {}
 	set transcripts {}
 	set ontindex 1
+	set bwaindex 1
 	set pacbioindex 0
 	set nolowgenecutoff 200000
 	set groupchromosomes {}
@@ -52,6 +53,10 @@ proc readsaber_makerefdir {args} {
 			}
 			-ontindex {
 				set ontindex $value
+				incr pos 2
+			}
+			-bwaindex {
+				set bwaindex $value
 				incr pos 2
 			}
 			-pacbioindex {
@@ -141,6 +146,12 @@ proc readsaber_makerefdir {args} {
 		puts "Making minimap2 ont index (can take large amount of memory)"
 		catch_exec cg refseq_minimap2 $result splice
 		catch_exec cg refseq_minimap2 $result splicesens
+	}
+
+	if {$bwaindex} {
+		# bwa index
+		puts "Making bwa index (can take large amount of memory)"
+		catch_exec cg refseq_bwa $result
 	}
 
 	if {$pacbioindex} {

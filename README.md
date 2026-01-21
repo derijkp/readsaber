@@ -48,7 +48,7 @@ ln -s readsaber-0.1.0-linux-x86_64/readsaber .
 ln -s readsaber-0.1.0-linux-x86_64/cg .
 ```
 
-readsaber is largely implemented within [genomecomb](https://github.com/derijkp/genomecomb), 
+readsaber is implemented using [genomecomb](https://github.com/derijkp/genomecomb), 
 and its distribution comes with an appropriate full version of genomecomb,
 which can be run using the cg executable, which also provides
 multiple usefull extra tools for querying tsv files, etc.
@@ -99,6 +99,11 @@ tar xvzf refdb_hg38-0.110.0.tar.gz
 wget https://genomecomb.bioinf.be/download/refdb_hg38-minimap2-0.110.0.tar.gz
 tar xvzf refdb_hg38-minimap2-0.110.0.tar.gz
 ```
+### bwa indexes
+By default readsaber_makerefdir will only create an ont minimap2 index for the genome.
+If you want to analyze short read data data, the appropriate index can be added by giving the 
+option '-bwaindex 1' to readsaber_makerefdir
+
 ### PacBio indexes
 By default readsaber_makerefdir will only create an ont minimap2 index for the genome.
 If you want to analyze PacBio data, the appropriate index can be added by giving the 
@@ -111,10 +116,11 @@ You can run readsaber using the following command
 readsaber ?options? annotationfile resultfile fastq ?fastq? ...
 ```
 This will analyse the data in the given fastq (or unaligned bam) files
-and write the results per read in **result**
+and write the results per read in **resultfile**
 and a summary (counts and percentage of each structure detected) of the 
 results (which you mostly look at) in <result.base>_summary.tsv
 
+**annotationfile** is a fasta format file with the primers, adapters and other structural elements you want to check for.
 
 Possible options are:
 `-refseq`
@@ -153,6 +159,9 @@ Possible options are:
     e.g. the default is minimap2_splicesens for using the minimap2 aligner with the "splicesens" 
     preset (minimap2 splice preset with options for extra sensitivity).
     For short read data, the method "bwa_short" is advised.
+
+`-refminsize integer`
+    (remaining) reference annotations smaller than the given number are ignored (annotated as N). (default 7)
 
 `-keepintermediate 0/1`
     set to 1 to keep intermediate files for development/debugging
