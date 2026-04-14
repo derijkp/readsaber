@@ -1,0 +1,6 @@
+schema	count	percent	q1_readsize	avg_readsize	q3_readsize
++ Ad3 ~ N + P7 ~ transcript	2	28.5714	76	76.0	76
++ rRNA	2	28.5714	76	76.0	76
+~ N + rRNA	1	14.2857	76.0	76.0	76.0
+~ N ~ transcript + Ad3 ~ N + P7	1	14.2857	76.0	76.0	76.0
+~ transcript + Ad3 ~ N	1	14.2857	76.0	76.0	76.0

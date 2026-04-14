@@ -1,0 +1,6 @@
+simpleschema	count	percent	q1_readsize	avg_readsize	q3_readsize
+TSO transcript Read1	4	40	163.5	207.75	252.0
+	2	20	15	16.0	17
+polyT	2	20	41	42.0	43
+transcript Read1	1	10	232.0	232.0	232.0
+TSO Read1	1	10	194.0	194.0	194.0

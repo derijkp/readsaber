@@ -58,11 +58,17 @@ some due to actual different read structures present.
 Results will be written to the file given in **result**, a [[tsv]] file with the following fields
 ; rname: name of the read
 ; schema: read structure schema
+; simpleschema: simplified read structure schema
 ; schema2: alternative read structure schema (adds size to N stretches)
 
 Another file **<resultroot>_summary.tsv** (where <resultroot> is the file name **result** without filename extension),
 will be made with summary data: each read structure found together with the number of reads
 that have this structure (and the percentage). They are sorted by abundance, with the most common structures listed first
+
+An accompanying file **<resultroot>_summary.png** shows the (> 1% abundance) results graphically.
+
+Files **<resultroot>_simplesummary.tsv** and **<resultroot>_simplesummary.pnmg** are 
+the same as the summary file, but giving information on the simpleschema
 
 === Transcript annotation ===
 You can give (as an option) a reference genome sequence. In this case reads will also be aligned to this
@@ -93,6 +99,8 @@ will be annotated as "transcript".
     the default is minimap2_splicesens for using the minimap2 aligner with the "splicesens" preset (minimap2 splice preset with options for extra sensitivity).
     For short read data, the method "bwa_short" is advised.
 : -refminsize integer: (remaining) reference annotations smaller than the given number are ignored (annotated as N). (default 7)
+; -simplify_remove list: list of elements to remove when making simpleschema
+; -simplify_trim list: list of elements to trim when making simpleschema (trimming means they are removed only if on the ends of schema)
 ; -keepintermediate 0/1: set to 1 to keep intermediate files for development/debugging
 
 The command supports analysing fastqs/ubams in parallel using [[joboptions]], e.g. adding -d <number> will analyse each fastq on

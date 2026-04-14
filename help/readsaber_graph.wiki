@@ -1,0 +1,21 @@
+= readsaber graph =
+
+== Format ==
+readsaber graph ?options? summaryfile result
+
+== Description ==
+
+Make a graph of all 
+
+== Arguments ==
+* summaryfile: A readsaber output summary file
+* result: result file in png format with the graph
+
+== Options ==
+; -annotationfile filename: The reference annotation file, needed to consistently color elements over different file (currently obligatory)
+; -usesimpleschema 0/1: default is to use the full schema with stramd (in column schema), set to 1 to use the 
+simpleschema field that does not have strand in the schema
+; -specialelements list: list of elements/ids in the summary that cannot be deduced from the annotation file (added using the -refseq and -refseqannot options)
+
+== Category ==
+graph

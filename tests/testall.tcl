@@ -81,6 +81,7 @@ test readsaber {basic} {
 	file copy data/test1.fastq tmp/test1.fastq
 	exec readsaber -stack 1 \
 		-keepintermediate 1 \
+		-polyT 7 \
 		-addsequences 1 \
 		-refseq tmp/genome_test \
 		tmp/annot.fa \
@@ -90,7 +91,9 @@ test readsaber {basic} {
 	exec diff tmp/readannot-test.tsv data/test1-readannot-test.tsv
 	exec diff tmp/readannot-test_summary.tsv data/test1-readannot-test_summary.tsv
 	exec diff tmp/readannot-test_shortsummary.tsv data/test1-readannot-test_shortsummary.tsv
-} {}
+	exec diff tmp/readannot-test_simplesummary.tsv data/test1-readannot-test_simplesummary.tsv
+	bsort [glob tmp/*.png]
+} {tmp/readannot-test_simplesummary.png tmp/readannot-test_summary.png}
 
 test readsaber {multiple refseq} {
 	test_cleantmp
@@ -101,6 +104,7 @@ test readsaber {multiple refseq} {
 	exec readsaber \
 		-keepintermediate 1 \
 		-addsequences 1 \
+		-polyT 7 \
 		-refseq tmp/genome_test \
 		-refseq tmp/genome_test2 \
 		tmp/annot.fa \
@@ -108,6 +112,7 @@ test readsaber {multiple refseq} {
 		tmp/test1.fastq 2> tmp/test1.log
 	exec diff tmp/readannot-test.tsv data/test2-readannot-test.tsv
 	exec diff tmp/readannot-test_summary.tsv data/test2-readannot-test_summary.tsv
+	exec diff tmp/readannot-test_simplesummary.tsv data/test2-readannot-test_simplesummary.tsv
 } {}
 
 test readsaber {-polyT 12} {
@@ -125,6 +130,7 @@ test readsaber {-polyT 12} {
 		tmp/test1.fastq 2> tmp/test1.log
 	exec diff tmp/readannot-test.tsv data/test-polyT12-readannot-test.tsv
 	exec diff tmp/readannot-test_summary.tsv data/test-polyT12-readannot-test_summary.tsv
+	exec diff tmp/readannot-test_simplesummary.tsv data/test-polyT12-readannot-test_simplesummary.tsv
 } {}
 
 test readsaber {-polyT 0} {

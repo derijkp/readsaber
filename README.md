@@ -167,6 +167,12 @@ Possible options are:
 `-refminsize integer`
     (remaining) reference annotations smaller than the given number are ignored (annotated as N). (default 7)
 
+`-simplify_remove list`
+    list of elements to remove when making simpleschema
+
+`-simplify_trim list`
+    list of elements to trim when making simpleschema (trimming means they are removed only if on the ends of schema)
+
 `-keepintermediate 0/1`
     set to 1 to keep intermediate files for development/debugging
 
@@ -228,6 +234,12 @@ Resultfile has the following fields
         "~ transcript" is a match (spliced alignment) to anywhaer on the first reference genome given (would be "transcript2" for the second, etc.).
         "~ N" is added when there are >= 'ignoreN' unassigned bases in the stretch
 
+`simpleschema`
+    simplified read structure schema
+    strand info is removed, but if the majority of elements is - strand, the order of elements is reversed
+    Ns are removed, as other elements given by the -simplify_remove options (default empty)
+    elements given by the -simplify_trim (default empty) option are removed if they are at the ends of the schema
+
 `shortschema`
     short version of the schema: same there are no 'N's recorded in the structure
 
@@ -240,7 +252,7 @@ Resultfile has the following fields
 
 Summary files
 --------------
-Readsaber also creates 2 summary files giving a breakdown of the abundance of the different structures/schemas. 
+Readsaber also creates 3 summary files giving a breakdown of the abundance of the different structures/schemas. 
 Their name is based on the the root of the resultfile, with added _summary (before the extension), so e.g. if
 resultfile has a file name "readannot-test.tsv", the summary file will be named "readannot-test_summary.tsv"
 The summary file is a tab-separated value file with the following fields:
@@ -263,7 +275,33 @@ The summary file is a tab-separated value file with the following fields:
 `q3_readsize`
     quartile 3 of readsize (of reads with this schema)
 
+The file "readannot-test_simplesummary.tsv" is also made, and gives the same information bases on the "simpleschema" field
+
 The file "readannot-test_shortsummary.tsv" is also made, and gives the same information bases on the "shortschema" field
+
+Summary graphs
+--------------
+The files 'readannot-test_summary.png' and 'readannot-test_simplesummary.png' will contain a grpahical display of
+the information in the summary files (only the schemas > 1%)
+
+Such graphs can be made afterwards as well using the command 
+
+```
+readsaber graph ?options? summaryfile result
+```
+
+with options:
+`-annotationfile`
+    the annotation file used for making the readsaber analyses and summary. This is obligatory
+
+`-usesimpleschema`
+    idicate with 0 or 1 if the is a 
+
+`-specialelements`
+list of elements/ids in the summary that cannot be deduced from the annotation file (added using the -refseq and -refseqannot options)
+
+
+
 
 License
 -------

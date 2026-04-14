@@ -25,11 +25,52 @@ proc help_get {action} {
 	return $help
 }
 
+# procs
+# -----
 proc shortenname {string} {
 	join [list_remdup [split $string _-]] _
 }
 
+proc simplifyschema {schema args} {
+	set removeelements {}
+	set trimelements {}
+	if {[llength $args]} {
+		foreach {removeelements trimelements} $args break
+	}
+	if {[llength $removeelements]} {set useremoveelements 1} else {set useremoveelements 0}
+	if {[llength $trimelements]} {set usetrimelements 1} else {set usetrimelements 0}
+	set simpleschema {}
+	unset -nocomplain a
+	set prev ""
+	foreach {strand type} $schema {
+		if {$useremoveelements && $type in $removeelements} continue
+		if {$prev ne "" && $type eq $prev} continue
+		incr a($strand)
+		lappend simpleschema $type
+		set prev $type
+	}
+	if {$usetrimelements} {
+		set pos 0
+		foreach el $simpleschema {
+			if {$el ni $trimelements} break
+			incr pos
+		}
+		set simpleschema [lrange $simpleschema $pos end]
+		set pos [llength $simpleschema]
+		foreach el [list_reverse $simpleschema] {
+			incr pos -1
+			if {$el ni $trimelements} break
+		}
+		set simpleschema [lrange $simpleschema 0 $pos]
+	}
+	if {[get a(-) 0] < [get a(+) 0]} {
+		set simpleschema [list_reverse $simpleschema]
+	}
+	return $simpleschema
+}
+
 # main proc, using job system
+# ---------------------------
 proc readsaber_job {args} {
 	upvar job_logdir job_logdir
 	set cmdline [clean_cmdline cg readsaber {*}$args]
@@ -45,6 +86,8 @@ proc readsaber_job {args} {
 	set polyT 16
 	set completeness 50
 	set threads 2
+	set simplify_remove {N}
+	set simplify_trim {}
 	if {[lindex $args] in "-h -help help"} {
 		help readsaber
 		exit 0
@@ -64,6 +107,8 @@ proc readsaber_job {args} {
 			set polyT $value
 		}
 		-completeness {set completeness $value}
+		-simplify_remove {set simplify_remove $value}
+		-simplify_trim {set simplify_trim $value}
 		-threads {set threads $value}
 		-version - -V {
 			puts "v0.1.0"
@@ -99,6 +144,9 @@ proc readsaber_job {args} {
 
 	set method $alimethod ; set alipreset {}
 	regexp {(^[^_]+)_(.*)$} $alimethod temp alimethod alipreset
+#	if {$alimethod eq "minimap2"} {
+#		lappend aliextraopts -p 0.5 -N 500
+#	}
 	set annotrefseq [refseq_${alimethod}_job $annotationfile $alipreset]
 	set refalipreset {}
 	regexp {(^[^_]+)_(.*)$} $refalimethod temp refalimethod refalipreset
@@ -118,7 +166,7 @@ proc readsaber_job {args} {
 	}
 	set alist {}
 
-	set endtargets [list $result $resultdir/${root}_summary.tsv $resultdir/${root}_shortsummary.tsv]
+	set endtargets [list $result $resultdir/${root}_summary.tsv $resultdir/${root}_shortsummary.tsv $resultdir/${root}_simplesummary.tsv]
 	foreach fastq $fastqs {
 		set tail [file root [gzroot [file tail $fastq]]]
 		if {[string length $root-$tail.polyt.ali.tsv.temp.zst] >= 252} {
@@ -254,6 +302,7 @@ proc readsaber_job {args} {
 			$tempfastq
 		} -vars {
 			concat addsequences ignoreN remN polyT completeness annotationfile refminsize
+			simplify_remove simplify_trim
 		} -code {
 			# read annotation sizes
 			set f [gzopen $annotationfile]
@@ -273,7 +322,7 @@ proc readsaber_job {args} {
 			catch {gzclose $f}; catch {gzclose $o}
 			set f [gzopen $src]
 			set o [wgzopen $target.temp.zst]
-			set oheader rname\treadsize\tschema\tshortschema\tschema2
+			set oheader rname\treadsize\tschema\tshortschema\tsimpleschema\tschema2
 			if {$addsequences} {append oheader \tsequences}
 			puts $o $oheader
 			set header [tsv_open $f]
@@ -310,7 +359,7 @@ proc readsaber_job {args} {
 				# get sequence from first (if it does not have sequence, from another)
 				foreach {rstart rend seqstrand chromosome qstart qend priority seq} [lindex $todo 0] break
 				#
-# if {$curname eq "@seq7"} {error testing_interrupt}
+# if {$curname eq "@00ab4554-1acd-43b0-b4ae-f7aa44c2745d"} {error testing_interrupt}
 				# find a non-empty sequence
 				# -------------------------
 				set seqs [list_subindex $todo 7]
@@ -489,13 +538,14 @@ proc readsaber_job {args} {
 						lappend sequences $strand ${chromosome} [string range $seq $start [expr {$end-1}]]
 					}
 				}
+				set simpleschema [simplifyschema $schema $simplify_remove $simplify_trim]
 				# putsvars schema schema2 shortschema sequences
 				#
 				# write to output
 				if {$addsequences} {
-					puts $o [string range $curname 1 end]\t$readsize\t[join $schema]\t[join $shortschema]\t[join $schema2]\t$sequences
+					puts $o [string range $curname 1 end]\t$readsize\t$schema\t$shortschema\t$simpleschema\t$schema2\t$sequences
 				} else {
-					puts $o [string range $curname 1 end]\t$readsize\t[join $schema]\t[join $shortschema]\t[join $schema2]
+					puts $o [string range $curname 1 end]\t$readsize\t$schema\t$shortschema\t$simpleschema\t$schema2
 				}
 				set curname $nextrname
 				set pend 0
@@ -512,6 +562,7 @@ proc readsaber_job {args} {
 		$result
 		$resultdir/${root}_summary.tsv
 		$resultdir/${root}_shortsummary.tsv
+		$resultdir/${root}_simplesummary.tsv
 	} -vars {
 		alist root resultdir result
 	} -code {
@@ -521,11 +572,192 @@ proc readsaber_job {args} {
 		file rename -force $resultdir/${root}_summary.tsv.temp2 $resultdir/${root}_summary.tsv
 		cg select -s -count -g shortschema -gc count,percent,q1(readsize),avg(readsize),q3(readsize) $result > $resultdir/${root}_shortsummary.tsv.temp2
 		file rename -force $resultdir/${root}_shortsummary.tsv.temp2 $resultdir/${root}_shortsummary.tsv
+		cg select -s -count -g simpleschema -gc count,percent,q1(readsize),avg(readsize),q3(readsize) $result > $resultdir/${root}_simplesummary.tsv.temp2
+		file rename -force $resultdir/${root}_simplesummary.tsv.temp2 $resultdir/${root}_simplesummary.tsv
+	}
+
+	set specialelements {}
+	set refnr 0
+	foreach refseqannot $refseqannots {
+		incr refnr
+		if {$refnr == 1} {set postfix ""} else {set postfix $refnr}
+		if {$refseqannot ne ""} {lappend specialelements [subst $refseqannot]}
+	}
+	if {$polyT} {
+		lappend specialelements polyT
+	}	
+
+	job readsaber_graphs-[file tail $result] -procs {readsaber_graph} -deps {
+		$annotationfile
+		$resultdir/${root}_summary.tsv
+		$resultdir/${root}_simplesummary.tsv
+	} -targets {
+		$resultdir/${root}_summary.png
+		$resultdir/${root}_simplesummary.png
+	} -vars {
+		root resultdir result specialelements annotationfile
+	} -code {
+		readsaber_graph \
+			-usesimpleschema 0 \
+			-annotationfile $annotationfile \
+			-specialelements $specialelements \
+			$resultdir/${root}_summary.tsv \
+			$resultdir/${root}_summary.png
+		readsaber_graph \
+			-usesimpleschema 1 \
+			-annotationfile $annotationfile \
+			-specialelements $specialelements \
+			$resultdir/${root}_simplesummary.tsv \
+			$resultdir/${root}_simplesummary.png
+	}
+}
+
+proc readsaber_graph {args} {
+	set usesimpleschema 0
+	set annotationfile {}
+	set specialelements {N transcript polyT}
+	cg_options readsaber_graph args {
+		-usesimpleschema {set usesimpleschema $value}
+		-annotationfile {set annotationfile $value}
+		-specialelements {
+			set specialelements [list_remdup [list N {*}$value]]
+		}
+	} {file result} 2 2 {
+		Make readsaber graph
+	}
+	if {$annotationfile eq ""} {error "-annotationfile must (currently) be given"}
+	R -vars {file annotationfile result usesimpleschema} -listvars {specialelements} {
+	
+		library(tidyverse)
+		library(patchwork)
+
+		annotation <- read_tsv(file)%>%
+			filter(percent >= 1)
+		if (usesimpleschema) {
+			annotation$simpleschema[is.na(annotation$simpleschema)] = ""
+			annotation$schema = annotation$simpleschema
+		}
+		layout <- read_tsv(annotationfile, col_names = FALSE)
+		fasta <- tibble(name = layout$X1[seq(1,nrow(layout)-1, by = 2)],
+			seq = layout$X1[seq(2,nrow(layout), by = 2)]) %>%
+			mutate(l = nchar(seq),
+			name = str_remove(name, ">")) %>%
+			dplyr::select(-seq)
+		offset <- mean(annotation$count) * 0.5
+
+		color_palette <- c(
+			"#0072B2",  # Blue
+			"#E69F00",  # Orange
+			"#56B4E9",  # Sky Blue
+			"#D55E00",  # Vermilion
+			"#009E73",  # Bluish Green
+			"#CCBB44",  # Gold
+			"#999999",  # Gray
+			"#CC79A7",  # Reddish Purple
+			"#F0E442",  # Yellow
+			"#BB5500",  # Burnt sienna
+			"#DDCC77",  # Mustard
+			"#BBBBBB",  # Silver
+			"#EE6677",  # Rose
+			"#661100",  # Brown
+			"#AA3377",  # Magenta
+			"#228833",  # Forest green
+			"#882255",  # Dark Red
+			"#117733",  # Olive
+			"#AA4499",  # Coral
+			"#DDDDDD",  # Light Gray
+			"#44AA99",  # Teal
+			"#332288"  # Indigo
+		)
+		all_elements <- c(specialelements, fasta$name)
+		color_map <- setNames(
+			color_palette,
+			all_elements
+		)
+
+		p1 <- annotation %>%
+			mutate(schema = factor(schema, levels = rev(schema))) %>%
+			filter(percent >= 1) %>%
+			mutate(offset = count * 0.02) %>%
+			ggplot(aes(count, schema)) +
+			geom_histogram(stat = "identity", fill = "black") +
+			geom_text(aes(label = sprintf("%6.2f%%", percent)), x = 0, hjust = 0, family = "Courier New") +
+			theme_minimal() +
+			xlab("number of reads") +
+			ylab("") +
+			theme(axis.text.y = element_blank(),
+				panel.grid.major.y = element_blank(),
+			plot.margin = margin(5, 5, 5, 5)) +
+			scale_x_reverse(limits = c(max(annotation$count) + max(annotation$count)*0.2, 0)) +
+			coord_cartesian(clip = "off")
+		if (!usesimpleschema) {
+			p2 <- annotation %>%
+				mutate(schema = factor(schema, levels = rev(schema)))  %>%
+				dplyr::select(schema) %>%
+				mutate(split = str_split(schema, " [~+-] "),
+					symbols = str_extract_all(schema, "[~+-]")) %>%
+				unnest(c(split, symbols)) %>%
+				rowwise() %>%
+				mutate(split = str_remove(split, "[~+-] ")) %>% 
+				left_join(fasta, by = c("split" = "name")) %>%
+				mutate(l = ifelse(split == "N" | split == "polyT", 10, 
+					ifelse(split %in% specialelements, 50, l))) %>%
+				group_by(schema) %>%
+				mutate(start = cumsum(c(0, rev(rev(l)[-1]))),
+					end = start + l, 
+					middle = (start + end) / 2) %>%
+				ggplot() +
+				geom_segment(aes(y = schema, yend = schema, x = start, xend =end, col = split), size = 6) +
+				geom_segment(data = . %>% filter(symbols == "+"), aes(y = schema, yend = schema, x = start, xend =end), col = "white", arrow = arrow(length = unit(0.5,"cm")), linewidth = 1) +
+				geom_segment(data = . %>% filter(symbols == "-"), aes(y = schema, yend = schema, x = end, xend =start), col = "white", arrow = arrow(length = unit(0.5,"cm")), linewidth = 1) +
+				geom_text(aes(label = split, y = schema, x = middle), size = 3, fontface = "bold", color =   "black") +
+				theme_void() +
+				theme(legend.position = "none",plot.margin = margin(5, 5, 5, 2)) +
+				scale_color_manual(values = color_map)
+		} else {
+			p2 <- annotation %>%
+				mutate(schema = factor(schema, levels = rev(schema)))  %>%
+				dplyr::select(schema) %>%
+				mutate(split = str_split(schema, " ")) %>%
+				unnest(c(split)) %>%
+				rowwise() %>%
+				mutate(split = str_remove(split, "[~+-] ")) %>% 
+				left_join(fasta, by = c("split" = "name")) %>%
+				mutate(l = ifelse(split == "N" | split == "polyT", 10, 
+					ifelse(split %in% specialelements, 50, l))) %>%
+				group_by(schema) %>%
+				mutate(start = cumsum(c(0, rev(rev(l)[-1]))),
+					end = start + l, 
+					middle = (start + end) / 2) %>%
+				ggplot() +
+				geom_segment(aes(y = schema, yend = schema, x = start, xend =end, col = split), size = 6) +
+				geom_text(aes(label = split, y = schema, x = middle), size = 3, fontface = "bold", color =   "black") +
+				theme_void() +
+				theme(legend.position = "none",plot.margin = margin(5, 5, 5, 2)) +
+				scale_color_manual(values = color_map)
+		}
+		n_rows <- sum(annotation$percent >= 1)
+		row_height <- 0.25  # height in inches per row, adjust to taste
+		plot_height <- n_rows * row_height + 1
+		p1 + p2 + plot_layout(widths = c(3, 5))
+		ggsave(result,width = 15, height = plot_height, dpi = 300, bg = "white")
 	}
 }
 
 proc readsaber {args} {
 	# pick up options like -stack and -v
+	# check for subcommands
+	switch [lindex $args 0] {
+		graph {
+			if {[lindex $args 1] in "-h -help help"} {
+				help readsaber_graph
+				exit 0
+			}
+			set args [parse_generic_args readsaber [lrange $args 1 end]]
+			readsaber_graph {*}$args
+			return
+		}
+	}
 	set args [parse_generic_args readsaber $args]
 	# process common cg job_options (-d, -dsubmit, ...)
 	set args [job_init {*}$args]
