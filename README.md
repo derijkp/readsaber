@@ -142,7 +142,11 @@ Possible options are:
     annotations/assignments matching less then **number** percent of the annotation sequence are ignored (default 50)
 
 `-ignoreN number`
-    stretches with >= **number** unassigned bases will be indicated with N in the structure (default 3)
+    stretches of <= **number** unassigned bases will be mostly ignored (default 3): 
+    They will not be in te structures (except sequences), and if 2 e.g. transcript annotations are separated by <= **number** bases, they will be merged
+
+`-remN number`
+    N annotations with <= **number** unassigned bases will removed from the structure (default equal to ignoreN). This does not affect annotation merging.
 
 `-polyT number`
     A polyT will only be called by the specific polyT caller if at least **number** Ts (or As) were seen in a stretch (default 7).

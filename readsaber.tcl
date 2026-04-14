@@ -37,11 +37,12 @@ proc readsaber_job {args} {
 	set refseqannots {}
 	set keepintermediate 0
 	set addsequences 0
-	set alimethod minimap2_ontshort
-	set refalimethod minimap2_splicesens
+	set alimethod minimap2_short
+	set refalimethod minimap2_splice
 	set ignoreN 3
+	set remN {}
 	set refminsize 7
-	set polyT 7
+	set polyT 16
 	set completeness 50
 	set threads 2
 	if {[lindex $args] in "-h -help help"} {
@@ -57,6 +58,7 @@ proc readsaber_job {args} {
 		-keepintermediate {set keepintermediate $value}
 		-addsequences {set addsequences $value}
 		-ignoreN {set ignoreN $value}
+		-remN {set remN $value}
 		-polyT {
 			if {![isint $value]} {error "$value is not an integer; -polyT value must be an integer"}
 			set polyT $value
@@ -69,6 +71,12 @@ proc readsaber_job {args} {
 		}
 	} {annotationfile result fastq} 3 ... {
 		test
+	}
+	set aliextraopts {}
+	if {$remN eq ""} {
+		set remN $ignoreN
+	} elseif {$remN < $ignoreN} {
+		set remN $ignoreN
 	}
 	set annotationfile [file_absolute $annotationfile]
 	set result [file_absolute $result]
@@ -116,8 +124,9 @@ proc readsaber_job {args} {
 		if {[string length $root-$tail.polyt.ali.tsv.temp.zst] >= 252} {
 			set tail [shortenname $tail]
 		}
+		set perfastqfinal $workdir/$root-$tail.final.tsv.zst
 		set tempfastq $workdir/$root-$tail.fastq.gz
-		job maketempfastq-$root-$tail -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst -deps {
+		job maketempfastq-$root-$tail -skip $endtargets -skip $perfastqfinal -deps {
 			$fastq
 		} -targets {
 			$tempfastq
@@ -134,15 +143,16 @@ proc readsaber_job {args} {
 			file rename $tempfastq.temp $tempfastq
 		}
 		set toadd [list $workdir/$root-$tail.annot.ali.tsv.zst]
-		map_job -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst \
+		map_job -skip $endtargets -skip $perfastqfinal \
 			-nohardclips 1 -paired 0 -threads $threads \
 			-method $alimethod -preset $alipreset \
+			-extraopts $aliextraopts \
 			-sort nosort \
 			$workdir/$root-$tail.annot.ali.tsv.sam.zst \
 			$annotationfile \
 			annotation \
 			$tempfastq
-		job readannot_match-$root-$tail -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst -cores $threads -deps {
+		job readannot_match-$root-$tail -skip $endtargets -skip $perfastqfinal -cores $threads -deps {
 			$workdir/$root-$tail.annot.ali.tsv.sam.zst
 		} -targets {
 			$workdir/$root-$tail.annot.ali.tsv.zst
@@ -162,7 +172,7 @@ proc readsaber_job {args} {
 		set priority 2
 		if {$polyT} {
 			lappend toadd $workdir/$root-$tail.polyt.ali.tsv.zst
-			job readannot_polyt-$root-$tail -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst -deps {
+			job readannot_polyt-$root-$tail -skip $endtargets -skip $perfastqfinal -deps {
 				$tempfastq
 			} -targets {
 				$workdir/$root-$tail.polyt.ali.tsv.zst
@@ -186,7 +196,7 @@ proc readsaber_job {args} {
 				set useali $refseq
 			} else {
 				set useali $workdir/$root-$tail.refseq$postfix.${refalimethod}_$refalipreset.ali.sam.zst
-				map_job -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst \
+				map_job -skip $endtargets -skip $perfastqfinal \
 					-nohardclips 1 -paired 0 -threads $threads \
 					-method $refalimethod -preset $refalipreset \
 					-sort nosort \
@@ -195,7 +205,7 @@ proc readsaber_job {args} {
 					refseq$postfix \
 					$tempfastq
 			}
-			job readannot_match_ref$postfix-$root-$tail -skip $endtargets -skip $workdir/$root-$tail.annot.tsv.zst -deps {
+			job readannot_match_ref$postfix-$root-$tail -skip $endtargets -skip $perfastqfinal -deps {
 				$useali
 			} -targets {
 				$target
@@ -235,7 +245,7 @@ proc readsaber_job {args} {
 			file rename -force $concat.temp.zst $concat
 		}
 
-		set target $workdir/$root-$tail.annot.tsv.zst
+		set target $perfastqfinal
 		job readannot_schema-$root-$tail \
 		-deps [list {*}$concat $annotationfile] \
 		-targets {
@@ -243,14 +253,14 @@ proc readsaber_job {args} {
 		} -rmtargets {
 			$tempfastq
 		} -vars {
-			concat addsequences ignoreN polyT completeness annotationfile refminsize
+			concat addsequences ignoreN remN polyT completeness annotationfile refminsize
 		} -code {
 			# read annotation sizes
 			set f [gzopen $annotationfile]
 			unset -nocomplain minsizea
 			while 1 {
 				if {[gets $f name] == -1} break
-				set name [string range $name 1 end]
+				set name [lindex [string range $name 1 end] 0]
 				set seq [gets $f]
 				set size [string length $seq]
 				set minsizea($name) [expr {int($completeness*$size/100.0)}]
@@ -294,10 +304,11 @@ proc readsaber_job {args} {
 					continue
 				}
 				if {![llength $todo]} continue
+				# puts [join [list_subindex $todo 0 1 2 3 4 5 6] \n]
 				#
 				# we have a full todo (all hits on one read), process
 				# get sequence from first (if it does not have sequence, from another)
-				foreach {rstart rend seqstrand chromosome qstart qend seq priority} [lindex $todo 0] break
+				foreach {rstart rend seqstrand chromosome qstart qend priority seq} [lindex $todo 0] break
 				#
 # if {$curname eq "@seq7"} {error testing_interrupt}
 				# find a non-empty sequence
@@ -368,7 +379,7 @@ proc readsaber_job {args} {
 						# ignore same chromosome if not annot (priority 1)
 						# -> current will get prolonged
 						# annot will always be separated (to allow finding duplicate annots)
-						set pend $rend
+						if {$rend > $pend} {set pend $rend}
 					} elseif {$rend <= $pend} {
 						# ignore full overlap unless it is higher priority
 						if {$priority < $ppriority} {
@@ -401,10 +412,6 @@ proc readsaber_job {args} {
 								set rstart $pend
 							}
 							set Nsize 0
-						} else {
-							if {$Nsize >= $ignoreN} {
-								set Nstring [string range $seq $pend [expr {$rstart-1}]]
-							}
 						}
 						if {$ppriority ne "0"} {
 							set psize [expr {$pend-$pstart}]
@@ -471,7 +478,7 @@ proc readsaber_job {args} {
 				set sequences {}
 				foreach line $annots {
 					foreach {start end strand size chromosome priority} $line break
-					if {$chromosome ne "N" || $size >= $ignoreN} {
+					if {$chromosome ne "N" || $size >= $remN} {
 						lappend schema $strand $chromosome
 					}
 					if {$chromosome ne "N"} {
