@@ -30,7 +30,7 @@ from github
 and unpacking it, e.g.: 
 ```
 cd ~/bin
-wget https://github.com/derijkp/readsaber/releases/download/0.1.0/readsaber-0.1.0-linux-x86_64.tar.gz
+wget https://github.com/derijkp/readsaber/releases/download/v0.1.0/readsaber-0.1.0-linux-x86_64.tar.gz
 tar xvzf readsaber-0.1.0-linux-x86_64.tar.gz
 rm readsaber-0.1.0-linux-x86_64.tar.gz
 ```
@@ -66,6 +66,9 @@ cd readsaber_test
 
 # make refdir; This test data is human, but to limit space, we only use a part of chromosome 17 as the genome reference.
 readsaber_makerefdir g17 hg38-chr17-200000-220000.fa
+# because we use just a fraction of the genome reference (hg38-chr17-200000-220000.fa), 
+# most reads will not have an annotated transcripts (just N)
+# When run with a full genome reference, most reads would show a transcript
 
 # Run readsaber
 readsaber -v 2 -d 6 \
@@ -81,10 +84,7 @@ readsaber -v 2 -d 6 \
 cg viz result_summary.tsv
 
 # view the *.png files
-
-# because we use just a fraction of the genome reference (hg38-chr17-200000-220000.fa), 
-# most reads do not have an annotated transcripts (just N)
-# When run with a full genome reference, most reads will show a transcript
+xviewer *.png
 
 ```
 
