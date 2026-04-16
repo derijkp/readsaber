@@ -139,7 +139,7 @@ proc readsaber_job {args} {
 	}
 	set root [file root [gzroot [file tail $result]]]
 	set resultdir [file dir $result]
-	job_logfile [file dir $result]/sc_readsaber-[file tail $result] [file dir $result] $cmdline \
+	job_logfile [file dir $result]/readsaber-[file tail $result] [file dir $result] $cmdline \
 		{*}[versions genomecomb samtools dbdir zstd os]
 
 	set method $alimethod ; set alipreset {}
