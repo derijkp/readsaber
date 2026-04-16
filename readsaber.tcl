@@ -303,6 +303,8 @@ proc readsaber_job {args} {
 		} -vars {
 			concat addsequences ignoreN remN polyT completeness annotationfile refminsize
 			simplify_remove simplify_trim
+		} -procs {
+			simplifyschema
 		} -code {
 			# read annotation sizes
 			set f [gzopen $annotationfile]
