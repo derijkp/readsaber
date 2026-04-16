@@ -1,1 +1,3 @@
-build/* linguist-vendored
+build/** linguist-vendored
+readsaber.tcl linguist-language=Tcl
+readsaber_makerefdir.tcl linguist-language=Tcl
