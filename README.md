@@ -45,6 +45,7 @@ directory to find it's dependencies), e.g.
 ```
 cd ~/bin
 ln -s readsaber-0.1.0-linux-x86_64/readsaber .
+ln -s readsaber-0.1.0-linux-x86_64/readsaber_makerefdir .
 ln -s readsaber-0.1.0-linux-x86_64/cg .
 ```
 
@@ -63,14 +64,27 @@ tar xvzf readsaber_test.tar.gz
 
 cd readsaber_test
 
-# make refdir; This test data is human, but limited to chromosome 17, so we can use only a partial genome reference.
-readsaber_makerefdir g17 genome.fa
+# make refdir; This test data is human, but to limit space, we only use a part of chromosome 17 as the genome reference.
+readsaber_makerefdir g17 hg38-chr17-200000-220000.fa
 
 # Run readsaber
-readsaber -refseq g17 annotations.fa readannots.tsv fastq/*
+readsaber -v 2 -d 6 \
+	-addsequences 1 \
+	-refseq g17 \
+	-refseqannot transcript \
+	annotations_ontr10x.fa \
+	result.tsv.zst \
+	p1_scmix_chr17.fastq.gz
+
 
 # Check summary results
-cg viz readannots_summary.tsv
+cg viz result_summary.tsv
+
+# view the *.png files
+
+# because we use just a fraction of the genome reference (hg38-chr17-200000-220000.fa), 
+# most reads do not have an annotated transcripts (just N)
+# When run with a full genome reference, most reads will show a transcript
 
 ```
 
