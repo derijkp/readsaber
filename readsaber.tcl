@@ -443,6 +443,7 @@ proc readsaber_job {args} {
 										{*}[lrange $todo $pos end]]
 									set temp [lsort -index 0 -integer [lsort -index 1 -integer -decreasing $temp]]
 									set todo [list {*}[lrange $todo 0 [expr {$pos-1}]] {*}$temp]
+									set len [llength $todo]
 								}
 								set psize [expr {$rstart-$pstart}]
 								if {$psize > 0} {
