@@ -322,13 +322,14 @@ proc readsaber_job {args} {
 			set src $concat
 
 			catch {gzclose $f}; catch {gzclose $o}
-			set f [gzopen $src]
 			set o [wgzopen $target.temp.zst]
 			set oheader rname\treadsize\tschema\tshortschema\tsimpleschema\tschema2
 			if {$addsequences} {append oheader \tsequences}
+			set f [gzopen $src]
 			puts $o $oheader
 			set header [tsv_open $f]
-			set poss [list_cor $header {rstart rend strand chromosome qstart qend priority seq}]
+			set poss [list_cor $header {rstart rend strand chromosome qstart qend mapquality priority seq}]
+			set seqpos 8
 			set rnamepos [lsearch $header rname]
 			set curname {}
 			set curpos 0
@@ -359,12 +360,12 @@ proc readsaber_job {args} {
 				#
 				# we have a full todo (all hits on one read), process
 				# get sequence from first (if it does not have sequence, from another)
-				foreach {rstart rend seqstrand chromosome qstart qend priority seq} [lindex $todo 0] break
+				foreach {rstart rend seqstrand chromosome qstart qend mapquality priority seq} [lindex $todo 0] break
 				#
 # if {$curname eq "@00ab4554-1acd-43b0-b4ae-f7aa44c2745d"} {error testing_interrupt}
 				# find a non-empty sequence
 				# -------------------------
-				set seqs [list_subindex $todo 7]
+				set seqs [list_subindex $todo $seqpos]
 				set strands [list_subindex $todo 2]
 				foreach seq $seqs strand $strands {
 					if {$seq ni {* {}}} break
@@ -407,13 +408,13 @@ proc readsaber_job {args} {
 				set annots {}
 				set curpos 0
 				# go over (sorted) todo
-				foreach {pstart pend pstrand pchromosome pqstart pqend ppriority} {0 0 {} {} 0 0 0} break
+				foreach {pstart pend pstrand pchromosome pqstart pqend pmapquality ppriority} {0 0 {} {} 0 0 0 0} break
 				set pos 0
 				set len [llength $todo]
 				while {$pos < $len} {
 					set line [lindex $todo $pos]
 					incr pos
-					foreach {rstart rend strand chromosome qstart qend priority} $line break
+					foreach {rstart rend strand chromosome qstart qend mapquality priority} $line break
 					# putsvars rname rstart rend strand chromosome qstart qend
 					if {[regexp ^chr $chromosome]} {
 						# set chromosome transcript
@@ -424,7 +425,9 @@ proc readsaber_job {args} {
 						if {$qend-$qstart < $minsizea($chromosome)} continue
 					}
 # if {$chromosome eq "polyT"} error
-					# putsvars sequences line chromosome pchromosome strand pstrand ppriority priority rstart rend pstart pend
+					# putsvars sequences line chromosome pchromosome strand pstrand pmapquality mapquality ppriority priority rstart rend pstart pend
+					# puts [list $pstart $pend $pstrand $psize $pchromosome $ppriority]
+					# puts [list $rstart $rend $strand $size $chromosome $priority]
 					set Nsize [expr {$rstart-$pend}]
 					if {$chromosome eq $pchromosome && $strand eq $pstrand && $Nsize <= $ignoreN && $ppriority != 1 && $priority != 1} {
 						# ignore same chromosome if not annot (priority 1)
@@ -439,7 +442,7 @@ proc readsaber_job {args} {
 								# but is kept if it is at the ends
 							} else {
 								if {$pend > $rend} {
-									set temp [list [list $rend $pend $pstrand $pchromosome {} {} [expr {$pend - $rend}] $ppriority] \
+									set temp [list [list $rend $pend $pstrand $pchromosome {} {} [expr {$pend - $rend}] $pmapquality $ppriority] \
 										{*}[lrange $todo $pos end]]
 									set temp [lsort -index 0 -integer [lsort -index 1 -integer -decreasing $temp]]
 									set todo [list {*}[lrange $todo 0 [expr {$pos-1}]] {*}$temp]
@@ -448,12 +451,16 @@ proc readsaber_job {args} {
 								set psize [expr {$rstart-$pstart}]
 								if {$psize > 0} {
 									if {$ppriority > 2 && $psize < $refminsize} {set pchromosome N ; set pstrand ~}
-									lappend annots [list $pstart $rstart $pstrand $psize $pchromosome $ppriority]
+									lappend annots [list $pstart $rstart $pstrand $psize $pchromosome $pmapquality $ppriority]
 								}
 								set pend $rstart
-								foreach {pstart pend pstrand pchromosome pqstart pqend ppriority} \
-									[list $rstart $rend $strand $chromosome $qstart $qend $priority] break
+								foreach {pstart pend pstrand pchromosome pqstart pqend pmapquality ppriority} \
+									[list $rstart $rend $strand $chromosome $qstart $qend $mapquality $priority] break
 							}
+						} elseif {$priority == $ppriority 
+							&& [isint $pmapquality] && [isint $mapquality] && $mapquality > $pmapquality
+						} {
+							set pchromosome $chromosome
 						}
 					} else {
 						if {$rstart < $pend} {
@@ -469,17 +476,19 @@ proc readsaber_job {args} {
 							set psize [expr {$pend-$pstart}]
 							if {$psize > 0} {
 								if {$ppriority > 2 && $psize < $refminsize} {set pchromosome N ; set pstrand ~}
-								lappend annots [list $pstart $pend $pstrand $psize $pchromosome $ppriority]
+								lappend annots [list $pstart $pend $pstrand $psize $pchromosome $mapquality $ppriority]
 							}
 						}
 						if {$Nsize > 0} {
 							lappend annots [list $pend $rstart ~ $Nsize N]
 						}
-						foreach {pstart pend pstrand pchromosome pqstart pqend ppriority} \
-							[list $rstart $rend $strand $chromosome $qstart $qend $priority] break
+						foreach {pstart pend pstrand pchromosome pqstart pqend pmapquality ppriority} \
+							[list $rstart $rend $strand $chromosome $qstart $qend $mapquality $priority] break
 					}
 					set ppriority $priority
+					set pmapquality $mapquality
 				}
+				# puts [list $pstart $pend $pstrand $psize $pchromosome $ppriority]
 				# Add previous (lagging)
 				set psize [expr {$pend-$pstart}]
 				if {$psize > 0} {
