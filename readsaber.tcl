@@ -580,16 +580,6 @@ proc readsaber_job {args} {
 	}
 
 	set specialelements {}
-	set refnr 0
-	foreach refseqannot $refseqannots {
-		incr refnr
-		if {$refnr == 1} {set postfix ""} else {set postfix $refnr}
-		if {$refseqannot ne ""} {lappend specialelements [subst $refseqannot]}
-	}
-	if {$polyT} {
-		lappend specialelements polyT
-	}	
-
 	job readsaber_graphs-[file tail $result] -procs {readsaber_graph} -deps {
 		$annotationfile
 		$resultdir/${root}_summary.tsv
@@ -628,7 +618,18 @@ proc readsaber_graph {args} {
 	} {file result} 2 2 {
 		Make readsaber graph
 	}
-	if {$annotationfile eq ""} {error "-annotationfile must (currently) be given"}
+	if {$annotationfile eq ""} {
+		set annotnames {}
+	} else {
+		set annotnames [split [string trim [cg fasta2tsv $annotationfile | cg select -sh /dev/null -f id]] \n]
+	}
+	if {$usesimpleschema} {
+		set elements [list_remove [list_subindex [lrange [split [cg select -g -simpleschema $file] \n] 1 end] 0] + - ~]
+	} else {
+		set elements [list_remove [list_subindex [lrange [split [cg select -g -schema $file] \n] 1 end] 0] + - ~]
+	}
+	set specialelements [list_union $specialelements $elements]
+	set specialelements [list_lremove $specialelements $annotnames]
 	R -vars {file annotationfile result usesimpleschema} -listvars {specialelements} {
 	
 		library(tidyverse)
