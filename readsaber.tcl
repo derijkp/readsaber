@@ -63,7 +63,7 @@ proc simplifyschema {schema args} {
 		}
 		set simpleschema [lrange $simpleschema 0 $pos]
 	}
-	if {[get a(-) 0] < [get a(+) 0]} {
+	if {[get a(-) 0] > [get a(+) 0]} {
 		set simpleschema [list_reverse $simpleschema]
 	}
 	return $simpleschema
