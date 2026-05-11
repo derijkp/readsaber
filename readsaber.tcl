@@ -70,7 +70,8 @@ proc simplifyschema {schema args} {
 }
 
 # code convert list of alignments (todo) to non-overlapping annotations (annots)
-proc todo2annots {todo seqpos refminsize ignoreN} {
+proc todo2annots {todo seqpos refminsize ignoreN minsizeaVar} {
+	upvar $minsizeaVar minsizea
 	# get sequence from first (if it does not have sequence, from another)
 	foreach {rstart rend seqstrand chromosome qstart qend mapquality priority seq} [lindex $todo 0] break
 	#
@@ -240,6 +241,7 @@ proc todo2annots {todo seqpos refminsize ignoreN} {
 	if {[llength $pline]} {lappend temp $pline}
 	set annots $temp
 	# join $annots \n
+	list $annots $readsize $seq
 }
 
 # main proc, using job system
@@ -478,7 +480,7 @@ proc readsaber_job {args} {
 			concat addsequences ignoreN remN polyT completeness annotationfile refminsize
 			simplify_remove simplify_trim
 		} -procs {
-			simplifyschema
+			simplifyschema todo2annots
 		} -code {
 			# read annotation sizes
 			set f [gzopen $annotationfile]
@@ -534,7 +536,7 @@ proc readsaber_job {args} {
 				# if {$curname eq "@00a21d50-34be-4a64-89c1-f1fddfbab718"} {error testing_interrupt}
 				#
 				# we have a full todo (all hits on one read), process
-				set annots [todo2annots $todo $seqpos $refminsize $ignoreN]
+				foreach {annots readsize seq} [todo2annots $todo $seqpos $refminsize $ignoreN minsizea] break
 
 				#
 				# make schemas
