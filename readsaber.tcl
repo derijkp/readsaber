@@ -596,7 +596,7 @@ proc readsaber_job {args} {
 		file rename -force $resultdir/${root}_simplesummary.tsv.temp2 $resultdir/${root}_simplesummary.tsv
 	}
 
-	set specialelements {}
+	set specialelements {N transcript polyT}
 	job readsaber_graphs-[file tail $result] -procs {readsaber_graph} -deps {
 		$annotationfile
 		$resultdir/${root}_summary.tsv
@@ -686,11 +686,14 @@ proc readsaber_graph {args} {
 			"#882255",  # Dark Red
 			"#117733",  # Olive
 			"#AA4499",  # Coral
-			"#DDDDDD",  # Light Gray
 			"#44AA99",  # Teal
-			"#332288"  # Indigo
+			"#332288",  # Indigo
+			"#DDDDDD"  # Light Gray
 		)
 		all_elements <- c(specialelements, fasta$name)
+		if (length(all_elements) > length(color_palette)) {
+			color_palette = c(color_palette,rep("#DDDDDD",length(all_elements) - length(color_palette)))
+		}
 		color_map <- setNames(
 			color_palette,
 			all_elements
