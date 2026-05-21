@@ -24,19 +24,19 @@ needed depencies compiled in a way that they should work on all (except very
 ancient) Linux systems.
 
 Installation of the package is as simple as downloading the
-[distribution](https://github.com/derijkp/readsaber/releases/download/0.1.0/readsaber-0.1.0-linux-x86_64.tar.gz)
+[distribution](https://github.com/derijkp/readsaber/releases/download/0.1.1/readsaber-0.1.1-linux-x86_64.tar.gz)
 from github
 ([https://github.com/derijkp/readsaber](https://github.com/derijkp/readsaber))
 and unpacking it, e.g.: 
 ```
 cd ~/bin
-wget https://github.com/derijkp/readsaber/releases/download/v0.1.0/readsaber-0.1.0-linux-x86_64.tar.gz
-tar xvzf readsaber-0.1.0-linux-x86_64.tar.gz
-rm readsaber-0.1.0-linux-x86_64.tar.gz
+wget https://github.com/derijkp/readsaber/releases/download/v0.1.1/readsaber-0.1.1-linux-x86_64.tar.gz
+tar xvzf readsaber-0.1.1-linux-x86_64.tar.gz
+rm readsaber-0.1.1-linux-x86_64.tar.gz
 ```
 
 You can call the executables (readsaber, cg) directly from the directory
-using the path (e.g. `~/bin/readsaber-0.1.0-linux-x86_64/readsaber ..`) 
+using the path (e.g. `~/bin/readsaber-0.1.1-linux-x86_64/readsaber ..`) 
 or by placing the directory in the PATH environment variable (e.g. using 
 `export PATH=~/bin/:$PATH`)
 You can also place soft-links to the executables in a directory already in
@@ -44,9 +44,9 @@ the PATH. (remark: The executable itself needs to stay in the application
 directory to find it's dependencies), e.g.
 ```
 cd ~/bin
-ln -s readsaber-0.1.0-linux-x86_64/readsaber .
-ln -s readsaber-0.1.0-linux-x86_64/readsaber_makerefdir .
-ln -s readsaber-0.1.0-linux-x86_64/cg .
+ln -s readsaber-0.1.1-linux-x86_64/readsaber .
+ln -s readsaber-0.1.1-linux-x86_64/readsaber_makerefdir .
+ln -s readsaber-0.1.1-linux-x86_64/cg .
 ```
 
 readsaber is implemented using [genomecomb](https://github.com/derijkp/genomecomb), 
@@ -59,7 +59,7 @@ Example/test run
 As an example/test, the following code shows you how to download an example data set and run readsaber on it:
 ```
 # download and unpack test data
-wget https://github.com/derijkp/readsaber/releases/download/v0.1.0/readsaber_test.tar.gz
+wget https://github.com/derijkp/readsaber/releases/download/v0.1.1/readsaber_test.tar.gz
 tar xvzf readsaber_test.tar.gz
 
 cd readsaber_test
